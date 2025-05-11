@@ -1,0 +1,18 @@
+[
+  {
+    "city": "visakhapatnam",
+    "dc_code": "dkr",
+    "fe_number": "9948684380",
+    "ofd_date": "2025-02-16",
+    "route": "[{\"activities\":[{\"sequence\":0,\"type\":\"depot\"},{\"sequence\":1,\"distance_from_prev\":1085,\"type\":\"delivery\"},{\"sequence\":2,\"distance_from_prev\":845,\"type\":\"delivery\"},{\"sequence\":3,\"distance_from_prev\":495,\"type\":\"delivery\"},{\"sequence\":4,\"distance_from_prev\":372,\"type\":\"delivery\"},{\"sequence\":5,\"distance_from_prev\":469,\"type\":\"delivery\"},{\"sequence\":6,\"distance_from_prev\":418,\"type\":\"delivery\"},{\"sequence\":7,\"distance_from_prev\":783,\"type\":\"delivery\"},{\"sequence\":8,\"distance_from_prev\":705,\"type\":\"delivery\"},{\"sequence\":9,\"distance_from_prev\":892,\"type\":\"delivery\"},{\"sequence\":10,\"distance_from_prev\":1477,\"type\":\"delivery\"},{\"sequence\":11,\"distance_from_prev\":2267,\"type\":\"depot\"}]}]",
+    "total_distance": "9808"
+  },
+  {
+    "city": "visakhapatnam",
+    "dc_code": "dkr",
+    "fe_number": "9948684381",
+    "ofd_date": "2025-02-16",
+    "route": "[{\"activities\":[{\"sequence\":0,\"type\":\"depot\"},{\"sequence\":1,\"distance_from_prev\":1085,\"type\":\"delivery\"},{\"sequence\":2,\"distance_from_prev\":845,\"type\":\"delivery\"},{\"sequence\":3,\"distance_from_prev\":495,\"type\":\"delivery\"},{\"sequence\":4,\"distance_from_prev\":372,\"type\":\"delivery\"},{\"sequence\":5,\"distance_from_prev\":469,\"type\":\"delivery\"},{\"sequence\":6,\"distance_from_prev\":418,\"type\":\"delivery\"},{\"sequence\":7,\"distance_from_prev\":783,\"type\":\"delivery\"},{\"sequence\":8,\"distance_from_prev\":705,\"type\":\"delivery\"},{\"sequence\":9,\"distance_from_prev\":892,\"type\":\"delivery\"},{\"sequence\":10,\"distance_from_prev\":1477,\"type\":\"delivery\"},{\"sequence\":11,\"distance_from_prev\":2267,\"type\":\"depot\"}]}]",
+    "total_distance": "9808"
+  }
+]

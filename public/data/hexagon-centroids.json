@@ -1,0 +1,20 @@
+[
+  {
+    "hexagon_id": "8928308280fffff",
+    "cluster_id": 1,
+    "lat": 17.6868,
+    "lng": 83.2185
+  },
+  {
+    "hexagon_id": "8928308281fffff",
+    "cluster_id": 1,
+    "lat": 17.6968,
+    "lng": 83.2285
+  },
+  {
+    "hexagon_id": "8928308282fffff",
+    "cluster_id": 2,
+    "lat": 17.7068,
+    "lng": 83.2385
+  }
+]
