@@ -2,7 +2,7 @@
   "version": 2,
   "buildCommand": "CI=false GENERATE_SOURCEMAP=false NODE_OPTIONS='--max-old-space-size=8192' npm run build",
   "outputDirectory": "build",
-  "framework": "react",
+  "framework": "create-react-app",
   "routes": [
     {
       "src": "/static/(.*)",
