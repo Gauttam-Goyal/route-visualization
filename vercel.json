@@ -1,15 +1,8 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "build",
-        "buildCommand": "GENERATE_SOURCEMAP=false CI=false npm run build"
-      }
-    }
-  ],
+  "buildCommand": "CI=false GENERATE_SOURCEMAP=false NODE_OPTIONS='--max-old-space-size=8192' npm run build",
+  "outputDirectory": "build",
+  "framework": "react",
   "routes": [
     {
       "src": "/static/(.*)",
@@ -20,16 +13,16 @@
       "dest": "/favicon.ico"
     },
     {
-      "src": "/manifest.json",
-      "dest": "/manifest.json"
-    },
-    {
       "src": "/logo192.png",
       "dest": "/logo192.png"
     },
     {
       "src": "/logo512.png",
       "dest": "/logo512.png"
+    },
+    {
+      "src": "/manifest.json",
+      "dest": "/manifest.json"
     },
     {
       "src": "/(.*)",
