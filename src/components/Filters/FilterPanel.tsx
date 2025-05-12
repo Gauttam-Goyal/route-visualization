@@ -8,14 +8,19 @@ import {
     Box,
     Checkbox,
     ListItemText,
-    SelectChangeEvent
+    SelectChangeEvent,
+    TextField
 } from '@mui/material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { Filters } from '../../types';
 
 interface FilterOptions {
     cities: string[];
     dcCodes: string[];
     feNumbers: string[];
+    dates: string[];
 }
 
 interface FilterPanelProps {
@@ -53,11 +58,19 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filterOptions, filters, setFi
         });
     };
 
+    const handleDateChange = (event: SelectChangeEvent<string[]>) => {
+        setFilters({
+            ...filters,
+            date: event.target.value as string[]
+        });
+    };
+
     const handleReset = () => {
         setFilters({
             city: [],
             dcCode: [],
             feNumber: [],
+            date: [],
             dateRange: [null, null]
         });
     };
@@ -129,6 +142,25 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filterOptions, filters, setFi
                                     }
                                 }}
                             />
+                        </MenuItem>
+                    ))}
+                </Select>
+            </FormControl>
+
+            <FormControl fullWidth margin="normal" size="small">
+                <InputLabel>Date</InputLabel>
+                <Select
+                    multiple
+                    value={filters.date || []}
+                    label="Date"
+                    onChange={handleDateChange}
+                    renderValue={(selected) => (selected as string[]).join(', ')}
+                    disabled={filterOptions.dates.length === 0}
+                >
+                    {filterOptions.dates.map(date => (
+                        <MenuItem key={date} value={date}>
+                            <Checkbox checked={filters.date?.indexOf(date) > -1} />
+                            <ListItemText primary={date} />
                         </MenuItem>
                     ))}
                 </Select>

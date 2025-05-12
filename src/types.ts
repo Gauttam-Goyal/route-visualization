@@ -27,6 +27,7 @@ export interface Filters {
     city: string[];
     dcCode: string[];
     feNumber: string[];
+    date: string[];
     dateRange: (Date | null)[];
 }
 

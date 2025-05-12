@@ -42,8 +42,15 @@ const Dashboard: React.FC<DashboardProps> = ({
 
         const feNumbers = [...new Set(feFilteredRoutes.map(route => route.fe_number))].sort();
 
-        return { cities, dcCodes, feNumbers };
-    }, [routeData, filters.city, filters.dcCode]);
+        // Get dates based on selected city, DC, and FE
+        const dateFilteredRoutes = filters.feNumber.length > 0
+            ? feFilteredRoutes.filter(route => filters.feNumber.includes(route.fe_number))
+            : feFilteredRoutes;
+
+        const dates = [...new Set(dateFilteredRoutes.map(route => route.date))].sort();
+
+        return { cities, dcCodes, feNumbers, dates };
+    }, [routeData, filters.city, filters.dcCode, filters.feNumber]);
 
     const filteredData = React.useMemo(() => {
         return routeData.filter(route => {
@@ -75,7 +82,8 @@ const Dashboard: React.FC<DashboardProps> = ({
             return (
                 (filters.city.length === 0 || filters.city.includes(route.city)) &&
                 (filters.dcCode.length === 0 || filters.dcCode.includes(route.dc_code)) &&
-                (filters.feNumber.length === 0 || filters.feNumber.includes(route.fe_number))
+                (filters.feNumber.length === 0 || filters.feNumber.includes(route.fe_number)) &&
+                (filters.date.length === 0 || filters.date.includes(route.date))
             );
         });
     }, [routeData, filters]);

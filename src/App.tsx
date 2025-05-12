@@ -75,6 +75,7 @@ function App() {
     city: [],
     dcCode: [],
     feNumber: [],
+    date: [],
     dateRange: [null, null] as (Date | null)[]
   });
   const [sidebarOpen, setSidebarOpen] = useState(false);
