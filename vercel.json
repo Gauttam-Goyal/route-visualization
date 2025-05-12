@@ -5,7 +5,8 @@
       "src": "package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "build"
+        "distDir": "build",
+        "buildCommand": "CI=false npm run build"
       }
     }
   ],
@@ -34,5 +35,10 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
-  ]
+  ],
+  "env": {
+    "REACT_APP_MAP_CENTER_LAT": "20.5937",
+    "REACT_APP_MAP_CENTER_LNG": "78.9629",
+    "REACT_APP_MAP_ZOOM": "5"
+  }
 } 

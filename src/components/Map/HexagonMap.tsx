@@ -102,11 +102,13 @@ const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes })
                         <Tooltip>
                             <div>
                                 <strong>Route:</strong> {route.fe_number}<br />
+                                <strong>DC Code:</strong> {route.dc_code}<br />
                                 <strong>From:</strong> {activity.type}<br />
-                                <strong>From Cluster:</strong> {activity.cluster_id || 'N/A'}<br />
                                 <strong>To:</strong> {nextActivity.type}<br />
+                                <strong>From Cluster:</strong> {activity.cluster_id || 'N/A'}<br />
                                 <strong>To Cluster:</strong> {nextActivity.cluster_id || 'N/A'}<br />
-                                <strong>Distance:</strong> {nextActivity.distance_from_prev}m
+                                <strong>Segment Distance:</strong> {nextActivity.distance_from_prev}m<br />
+                                <strong>Total Route Distance:</strong> {parseInt(route.total_distance).toLocaleString()}m
                             </div>
                         </Tooltip>
                     </Polyline>

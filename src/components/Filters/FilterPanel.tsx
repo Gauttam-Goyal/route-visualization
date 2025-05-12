@@ -1,59 +1,30 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
     FormControl,
     InputLabel,
     Select,
     MenuItem,
-    TextField,
     Button,
     Box,
     Checkbox,
     ListItemText,
     SelectChangeEvent
 } from '@mui/material';
-import { DatePicker } from '@mui/x-date-pickers';
-import { Filters, RouteData } from '../../types';
+import { Filters } from '../../types';
+
+interface FilterOptions {
+    cities: string[];
+    dcCodes: string[];
+    feNumbers: string[];
+}
 
 interface FilterPanelProps {
-    routeData: RouteData[];
+    filterOptions: FilterOptions;
     filters: Filters;
     setFilters: (filters: Filters) => void;
 }
 
-const FilterPanel: React.FC<FilterPanelProps> = ({ routeData, filters, setFilters }) => {
-    const [cities, setCities] = useState<string[]>([]);
-    const [dcCodes, setDcCodes] = useState<string[]>([]);
-    const [feNumbers, setFeNumbers] = useState<string[]>([]);
-
-    useEffect(() => {
-        // Extract unique values
-        const uniqueCities = [...new Set(routeData.map(route => route.city))];
-        const uniqueDcCodes = [...new Set(routeData.map(route => route.dc_code))];
-        const uniqueFeNumbers = [...new Set(routeData.map(route => route.fe_number))];
-
-        setCities(uniqueCities.sort());
-        setDcCodes(uniqueDcCodes.sort());
-        setFeNumbers(uniqueFeNumbers.sort());
-    }, [routeData]);
-
-    // Filter DC codes based on selected city
-    const filteredDcCodes = React.useMemo(() => {
-        if (!filters.city.length) return dcCodes;
-        return [...new Set(routeData
-            .filter(route => filters.city.includes(route.city))
-            .map(route => route.dc_code))]
-            .sort();
-    }, [dcCodes, filters.city, routeData]);
-
-    // Filter FE numbers based on selected DC code
-    const filteredFeNumbers = React.useMemo(() => {
-        if (!filters.dcCode.length) return feNumbers;
-        return [...new Set(routeData
-            .filter(route => filters.dcCode.includes(route.dc_code))
-            .map(route => route.fe_number))]
-            .sort();
-    }, [feNumbers, filters.dcCode, routeData]);
-
+const FilterPanel: React.FC<FilterPanelProps> = ({ filterOptions, filters, setFilters }) => {
     const handleCityChange = (event: SelectChangeEvent<string[]>) => {
         const city = event.target.value as string[];
         setFilters({
@@ -102,7 +73,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ routeData, filters, setFilter
                     onChange={handleCityChange}
                     renderValue={(selected) => (selected as string[]).join(', ')}
                 >
-                    {cities.map(city => (
+                    {filterOptions.cities.map(city => (
                         <MenuItem key={city} value={city}>
                             <Checkbox checked={filters.city.indexOf(city) > -1} />
                             <ListItemText primary={city} />
@@ -119,9 +90,9 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ routeData, filters, setFilter
                     label="DC Code"
                     onChange={handleDcCodeChange}
                     renderValue={(selected) => (selected as string[]).join(', ')}
-                    disabled={filteredDcCodes.length === 0}
+                    disabled={filterOptions.dcCodes.length === 0}
                 >
-                    {filteredDcCodes.map(dc => (
+                    {filterOptions.dcCodes.map(dc => (
                         <MenuItem key={dc} value={dc}>
                             <Checkbox checked={filters.dcCode.indexOf(dc) > -1} />
                             <ListItemText primary={dc} />
@@ -143,9 +114,9 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ routeData, filters, setFilter
                         if (selectedFEs.length === 1) return selectedFEs[0];
                         return `${selectedFEs.length} FEs selected`;
                     }}
-                    disabled={filteredFeNumbers.length === 0}
+                    disabled={filterOptions.feNumbers.length === 0}
                 >
-                    {filteredFeNumbers.map(fe => (
+                    {filterOptions.feNumbers.map(fe => (
                         <MenuItem key={fe} value={fe}>
                             <Checkbox checked={filters.feNumber.indexOf(fe) > -1} />
                             <ListItemText 
