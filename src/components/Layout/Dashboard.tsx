@@ -1,9 +1,7 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Box, Paper, Typography, CircularProgress } from '@mui/material';
 import FilterPanel from '../Filters/FilterPanel';
-import HexagonMap from '../Map/HexagonMap';
 import DistanceMetrics from '../Analytics/DistanceMetrics';
-import DistanceChart from '../Analytics/DistanceChart';
 import { RouteData, LocationData, Filters } from '../../types';
 import { calculateAverages } from '../../utils/calculations';
 import { MAX_ROUTE_DISTANCE, getCityBoundary } from '../../utils/constants';
@@ -15,6 +13,10 @@ interface DashboardProps {
     filters: Filters;
     setFilters: (filters: Filters) => void;
 }
+
+// Lazily load the heavy components
+const HexagonMapLazy = lazy(() => import('../Map/HexagonMap'));
+const DistanceChartLazy = lazy(() => import('../Analytics/DistanceChart'));
 
 const Dashboard: React.FC<DashboardProps> = ({
     routeData,
@@ -120,17 +122,21 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <Paper>
                             <Box p={2} height="60vh">
                                 <Typography variant="h6" gutterBottom>Route Map</Typography>
-                                <HexagonMap
-                                    locationData={locationData}
-                                    filteredRoutes={filteredData}
-                                />
+                                <Suspense fallback={<CircularProgress />}>
+                                    <HexagonMapLazy
+                                        locationData={locationData}
+                                        filteredRoutes={filteredData}
+                                    />
+                                </Suspense>
                             </Box>
                         </Paper>
 
                         <Paper>
                             <Box p={2}>
                                 <Typography variant="h6" gutterBottom>Distance Analysis</Typography>
-                                <DistanceChart data={filteredData} />
+                                <Suspense fallback={<CircularProgress />}>
+                                    <DistanceChartLazy data={filteredData} />
+                                </Suspense>
                             </Box>
                         </Paper>
                     </Box>

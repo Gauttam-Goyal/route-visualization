@@ -6,7 +6,7 @@
       "use": "@vercel/static-build",
       "config": {
         "distDir": "build",
-        "buildCommand": "CI=false npm run build"
+        "buildCommand": "GENERATE_SOURCEMAP=false CI=false npm run build"
       }
     }
   ],
@@ -39,6 +39,7 @@
   "env": {
     "REACT_APP_MAP_CENTER_LAT": "20.5937",
     "REACT_APP_MAP_CENTER_LNG": "78.9629",
-    "REACT_APP_MAP_ZOOM": "5"
+    "REACT_APP_MAP_ZOOM": "5",
+    "NODE_OPTIONS": "--max-old-space-size=8192"
   }
 } 
