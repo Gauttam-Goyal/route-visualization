@@ -1,9 +1,10 @@
-import React from 'react';
-import { Box, Paper, Typography, CircularProgress } from '@mui/material';
+import React, { useState } from 'react';
+import { Box, Paper, Typography, CircularProgress, Tabs, Tab } from '@mui/material';
 import FilterPanel from '../Filters/FilterPanel';
 import HexagonMap from '../Map/HexagonMap';
 import DistanceMetrics from '../Analytics/DistanceMetrics';
 import DistanceChart from '../Analytics/DistanceChart';
+import SimulationPanel from '../Simulation/SimulationPanel';
 import { RouteData, LocationData, Filters } from '../../types';
 import { calculateAverages } from '../../utils/calculations';
 import { MAX_ROUTE_DISTANCE, getCityBoundary } from '../../utils/constants';
@@ -23,6 +24,8 @@ const Dashboard: React.FC<DashboardProps> = ({
     filters,
     setFilters
 }) => {
+    const [activeTab, setActiveTab] = useState(0);
+
     // Extract unique values for filters
     const filterOptions = React.useMemo(() => {
         // Get all cities
@@ -117,31 +120,60 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </Box>
 
                 <Box flex="1">
-                    <Box display="flex" flexDirection="column" gap={3}>
-                        <Paper>
-                            <Box p={2}>
-                                <Typography variant="h6" gutterBottom>Average Distance Metrics</Typography>
-                                <DistanceMetrics metrics={metrics} />
-                            </Box>
-                        </Paper>
+                    <Paper sx={{ mb: 3 }}>
+                        <Tabs value={activeTab} onChange={(e, newValue) => setActiveTab(newValue)}>
+                            <Tab label="Analytics" />
+                            <Tab label="Simulation 1" />
+                            <Tab label="Simulation 2" />
+                        </Tabs>
+                    </Paper>
 
-                        <Paper>
-                            <Box p={2} height="60vh">
-                                <Typography variant="h6" gutterBottom>Route Map</Typography>
-                                <HexagonMap
-                                    locationData={locationData}
-                                    filteredRoutes={filteredData}
+                    {activeTab === 0 ? (
+                        <Box display="flex" flexDirection="column" gap={3}>
+                            <Paper>
+                                <Box p={2}>
+                                    <Typography variant="h6" gutterBottom>Average Distance Metrics</Typography>
+                                    <DistanceMetrics metrics={metrics} />
+                                </Box>
+                            </Paper>
+
+                            <Paper>
+                                <Box p={2} height="60vh">
+                                    <Typography variant="h6" gutterBottom>Route Map</Typography>
+                                    <HexagonMap
+                                        locationData={locationData}
+                                        filteredRoutes={filteredData}
+                                    />
+                                </Box>
+                            </Paper>
+
+                            <Paper>
+                                <Box p={2}>
+                                    <Typography variant="h6" gutterBottom>Distance Analysis</Typography>
+                                    <DistanceChart data={filteredData} />
+                                </Box>
+                            </Paper>
+                        </Box>
+                    ) : (
+                        <Box display="flex" flexDirection="column" gap={3}>
+                            <Paper>
+                                <Box p={2} height="60vh">
+                                    <Typography variant="h6" gutterBottom>Route Map</Typography>
+                                    <HexagonMap
+                                        locationData={locationData}
+                                        filteredRoutes={filteredData}
+                                    />
+                                </Box>
+                            </Paper>
+
+                            <Paper>
+                                <SimulationPanel 
+                                    routeData={filteredData} 
+                                    simulationType={activeTab === 1 ? 'dc-to-hc' : 'hc-to-hc'}
                                 />
-                            </Box>
-                        </Paper>
-
-                        <Paper>
-                            <Box p={2}>
-                                <Typography variant="h6" gutterBottom>Distance Analysis</Typography>
-                                <DistanceChart data={filteredData} />
-                            </Box>
-                        </Paper>
-                    </Box>
+                            </Paper>
+                        </Box>
+                    )}
                 </Box>
             </Box>
         </Box>

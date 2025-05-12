@@ -6,6 +6,13 @@ export interface RouteData {
     ofd_date: string;
     route: string;
     total_distance: string;
+    activities?: Activity[];
+}
+
+export interface Activity {
+    sequence: number;
+    type: 'depot' | 'delivery';
+    distance_from_prev?: number;
 }
 
 export interface DcLocation {
