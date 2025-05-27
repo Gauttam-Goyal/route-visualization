@@ -106,18 +106,25 @@ const Dashboard: React.FC<DashboardProps> = ({
             const cityBoundary = getCityBoundary(route.city);
             if (!cityBoundary) {
                 console.warn(`No boundary found for city: ${route.city}`);
-                return true; // Allow routes even if boundary not found
+                return false; // Don't allow routes without boundary
             }
 
-            // More lenient boundary check - only check if any activity is within bounds
-            const anyActivityInBounds = route.activities.some(activity => {
-                return activity.lat >= cityBoundary.south &&
-                    activity.lat <= cityBoundary.north &&
-                    activity.lng >= cityBoundary.west &&
-                    activity.lng <= cityBoundary.east;
+            // Check if any activity is outside the boundary
+            const hasActivityOutsideBoundary = route.activities.some(activity => {
+                if (activity.type === 'delivery') {
+                    if (activity.lat < cityBoundary.south || 
+                        activity.lat > cityBoundary.north || 
+                        activity.lng < cityBoundary.west || 
+                        activity.lng > cityBoundary.east) {
+                        console.warn(`Route ${route.fe_number} on ${route.date} has activity outside city boundary`);
+                        return true;
+                    }
+                }
+                return false;
             });
 
-            if (!anyActivityInBounds) {
+            // If any activity is outside boundary, exclude the route
+            if (hasActivityOutsideBoundary) {
                 return false;
             }
 

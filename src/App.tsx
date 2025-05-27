@@ -111,7 +111,7 @@ function App() {
         const [header, ...rows] = lines;
 
         const mappingData = rows.map(row => {
-          const [city, dc_code, fe_number, ofd_date, hexagon_index, hexagon_lat, hexagon_lng, delivery_count, rto_percentage, delivery_details] = row.split(',').map(val => val.trim());
+          const [city, dc_code, fe_number, ofd_date, hexagon_index, hexagon_lat, hexagon_lng, delivery_count, rto_percentage, total_deliveries_all_time, total_rto_all_time, delivery_details] = row.split(',').map(val => val.trim());
           return {
             city,
             dc_code,

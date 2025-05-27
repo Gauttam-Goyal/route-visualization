@@ -1,7 +1,17 @@
 import { RouteData } from '../types';
 import * as L from 'leaflet';
+import { getCityBoundary } from '../utils/constants';
 
 export const getHexagonCentroidsForRoutes = (hexagonCentroids: any[], routes: RouteData[]): any[] => {
+    if (routes.length === 0) return [];
+    
+    // Get the city boundary for the first route's city
+    const cityBoundary = getCityBoundary(routes[0].city);
+    if (!cityBoundary) {
+        console.warn(`No boundary found for city: ${routes[0].city}`);
+        return [];
+    }
+
     // Create a map to store hexagon data including all routes and cluster IDs it appears in
     const hexagonMap = new Map<string, {
         routes: Set<string>,  // Set of "fe_number-date" strings
@@ -11,6 +21,26 @@ export const getHexagonCentroidsForRoutes = (hexagonCentroids: any[], routes: Ro
 
     // Collect all hexagons and their route/cluster information
     routes.forEach(route => {
+        // Check if any activity in the route is outside the boundary
+        const hasActivityOutsideBoundary = route.activities.some(activity => {
+            if (activity.type === 'delivery') {
+                if (activity.lat < cityBoundary.south || 
+                    activity.lat > cityBoundary.north || 
+                    activity.lng < cityBoundary.west || 
+                    activity.lng > cityBoundary.east) {
+                    console.warn(`Route ${route.fe_number} on ${route.date} has activity outside city boundary: ${activity.hexagon_index}`);
+                    return true;
+                }
+            }
+            return false;
+        });
+
+        // Skip the entire route if any activity is outside boundary
+        if (hasActivityOutsideBoundary) {
+            return;
+        }
+
+        // Process the route only if all activities are within boundary
         if (route.activities && Array.isArray(route.activities)) {
             route.activities.forEach(activity => {
                 if (activity.type === 'delivery' && activity.hexagon_index) {
@@ -37,7 +67,17 @@ export const getHexagonCentroidsForRoutes = (hexagonCentroids: any[], routes: Ro
 
     // Match with centroids and prepare final data
     const enrichedCentroids = hexagonCentroids
-        .filter(centroid => hexagonMap.has(centroid.hexagon_id))
+        .filter(centroid => {
+            // Check if centroid is within city boundaries
+            if (centroid.lat < cityBoundary.south || 
+                centroid.lat > cityBoundary.north || 
+                centroid.lng < cityBoundary.west || 
+                centroid.lng > cityBoundary.east) {
+                console.warn(`Centroid outside city boundary: ${centroid.hexagon_id}`);
+                return false;
+            }
+            return hexagonMap.has(centroid.hexagon_id);
+        })
         .map(centroid => {
             const hexData = hexagonMap.get(centroid.hexagon_id)!;
             return {

@@ -263,7 +263,9 @@ const ClusterBasedPayoutView: React.FC<ClusterPayoutViewProps> = ({
         // Calculate average RTO percentage for each cluster
         const avgClusterRtoPercentages = new Map<string, number>();
         clusterRtoPercentages.forEach((value, clusterId) => {
-            avgClusterRtoPercentages.set(clusterId, value.total / value.count);
+            // Cap the RTO percentage at 30%
+            const avgRto = Math.min(30, value.total / value.count);
+            avgClusterRtoPercentages.set(clusterId, avgRto);
         });
 
         routeData.forEach(route => {
