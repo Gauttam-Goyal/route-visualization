@@ -1,11 +1,11 @@
 import React from 'react';
-import { Box, Paper, Typography, CircularProgress, Tabs, Tab } from '@mui/material';
+import { Box, Paper, Typography, CircularProgress, Tabs, Tab, ButtonGroup, Button } from '@mui/material';
 import FilterPanel from '../Filters/FilterPanel';
 import HexagonMap from '../Map/HexagonMap';
 import DistanceMetrics from '../Analytics/DistanceMetrics';
 import DistanceChart from '../Analytics/DistanceChart';
 import PayoutsView from '../Analytics/PayoutsView';
-import { RouteData, LocationData, Filters, PayoutSummary, PayoutCalculation } from '../../types';
+import { RouteData, LocationData, Filters, PayoutSummary, PayoutCalculation, DirectDistancePayout, FlatDistancePayout } from '../../types';
 import { calculateAverages } from '../../utils/calculations';
 import { MAX_ROUTE_DISTANCE, getCityBoundary, AVAILABLE_CITIES } from '../../utils/constants';
 
@@ -52,6 +52,9 @@ const Dashboard: React.FC<DashboardProps> = ({
 }) => {
     const [activeTab, setActiveTab] = React.useState(0);
     const [payoutCalculations, setPayoutCalculations] = React.useState<PayoutCalculation[]>([]);
+    const [directPayoutCalculations, setDirectPayoutCalculations] = React.useState<DirectDistancePayout[]>([]);
+    const [flatPayoutCalculations, setFlatPayoutCalculations] = React.useState<FlatDistancePayout[]>([]);
+    const [viewMode, setViewMode] = React.useState<'route' | 'direct' | 'flat'>('route');
 
     // Extract unique values for filters
     const filterOptions = React.useMemo(() => {
@@ -180,18 +183,31 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <Paper>
                             <Box p={2} height="60vh">
                                 <Typography variant="h6" gutterBottom>Route Map</Typography>
-                                <HexagonMap
-                                    locationData={locationData}
-                                    filteredRoutes={filteredData}
-                                    payoutCalculations={payoutCalculations}
-                                />
+                                {(() => {
+                                    console.log('Dashboard - Current viewMode:', viewMode);
+                                    console.log('Dashboard - payoutCalculations:', payoutCalculations);
+                                    console.log('Dashboard - directPayoutCalculations:', directPayoutCalculations);
+                                    console.log('Dashboard - flatPayoutCalculations:', flatPayoutCalculations);
+                                    const currentPayouts = viewMode === 'route' ? payoutCalculations :
+                                        viewMode === 'direct' ? directPayoutCalculations :
+                                        flatPayoutCalculations;
+                                    console.log('Dashboard - Passing payouts to HexagonMap:', currentPayouts);
+                                    return (
+                                        <HexagonMap
+                                            locationData={locationData}
+                                            filteredRoutes={filteredData}
+                                            payoutCalculations={currentPayouts}
+                                            viewMode={viewMode}
+                                        />
+                                    );
+                                })()}
                             </Box>
                         </Paper>
 
                         <Paper>
                             <Box p={2}>
                                 <Typography variant="h6" gutterBottom>Distance Analysis</Typography>
-                                <DistanceChart data={filteredData} />
+                                <DistanceChart data={filteredData} locationData={locationData} />
                             </Box>
                         </Paper>
                     </Box>
@@ -201,9 +217,17 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <PayoutsView
                         routeData={filteredData}
                         locationData={locationData}
-                        onPayoutCalculated={(payouts: PayoutSummary[], calculations?: PayoutCalculation[]) => {
+                        onPayoutCalculated={(payouts: PayoutSummary[], calculations?: PayoutCalculation[] | DirectDistancePayout[] | FlatDistancePayout[]) => {
                             if (calculations) {
-                                setPayoutCalculations(calculations);
+                                if (Array.isArray(calculations) && calculations.length > 0) {
+                                    if ('clusterId' in calculations[0]) {
+                                        setPayoutCalculations(calculations as PayoutCalculation[]);
+                                    } else if ('directDistance' in calculations[0]) {
+                                        setDirectPayoutCalculations(calculations as DirectDistancePayout[]);
+                                    } else {
+                                        setFlatPayoutCalculations(calculations as FlatDistancePayout[]);
+                                    }
+                                }
                             }
                         }}
                     />

@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, CircleMarker, Polyline, Tooltip
 import 'leaflet/dist/leaflet.css';
 import * as L from 'leaflet';
 import { Box, Typography, Button, ButtonGroup } from '@mui/material';
-import { LocationData, RouteData, PayoutCalculation } from '../../types';
+import { LocationData, RouteData, PayoutCalculation, DirectDistancePayout, FlatDistancePayout } from '../../types';
 import { getHexagonCentroidsForRoutes } from '../../services/mapService';
 
 // Fix for Leaflet marker icons in React
@@ -22,14 +22,22 @@ L.Marker.prototype.options.icon = defaultIcon;
 interface HexagonMapProps {
     locationData: LocationData;
     filteredRoutes: RouteData[];
-    payoutCalculations: PayoutCalculation[];
+    payoutCalculations: PayoutCalculation[] | DirectDistancePayout[] | FlatDistancePayout[];
+    viewMode: 'route' | 'direct' | 'flat';
 }
 
-const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes, payoutCalculations }) => {
-    const [visibleCentroids, setVisibleCentroids] = useState<any[]>([]);
+interface Centroid {
+    hexagon_id: string;
+    lat: number;
+    lng: number;
+    cluster_id: string | undefined;
+    all_cluster_ids?: string[];
+}
+
+const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes, payoutCalculations, viewMode }) => {
+    const [visibleCentroids, setVisibleCentroids] = useState<Centroid[]>([]);
     const [mapCenter, setMapCenter] = useState<[number, number]>([23.0, 80.0]); // Default: Central India
     const [zoom, setZoom] = useState(5); // Default zoom level to show both cities
-    const [viewMode, setViewMode] = useState<'route' | 'direct'>('route');
 
     useEffect(() => {
         // Get hexagon centroids that match the filtered routes
@@ -56,8 +64,8 @@ const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes, p
             const dc = locationData.dcLocations.find(dc => dc.dc_code === route.dc_code);
             if (!dc) return [];
 
-            if (viewMode === 'direct') {
-                // For direct view, only show lines from DC to delivery points
+            if (viewMode === 'direct' || viewMode === 'flat') {
+                // For direct and flat views, only show lines from DC to delivery points
                 const deliveryActivities = activities.filter(activity => activity.type === 'delivery');
                 
                 // Find min and max distances for color scaling
@@ -90,10 +98,13 @@ const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes, p
                 return deliveryActivities.map((activity, index) => {
                     const distance = activity.distance_from_dc || 0;
                     const color = getColorForDistance(distance);
+                    const distanceInKm = distance / 1000;
+                    const flatRate = 50; // ₹50 per kilometer
+                    const flatPayout = Math.round(distanceInKm * flatRate);
                     
                     return (
                         <Polyline
-                            key={`${routeIndex}-${index}-direct`}
+                            key={`${routeIndex}-${index}-${viewMode}`}
                             positions={[
                                 [dc.lat, dc.lng],
                                 [activity.lat, activity.lng]
@@ -111,6 +122,11 @@ const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes, p
                                     <strong>Route:</strong> {route.fe_number}<br />
                                     <strong>DC Code:</strong> {route.dc_code}<br />
                                     <strong>Direct Distance:</strong> {activity.distance_from_dc?.toFixed(2)}m<br />
+                                    {viewMode === 'flat' && (
+                                        <>
+                                            <strong>Flat Distance Payout:</strong> ₹{flatPayout}<br />
+                                        </>
+                                    )}
                                     <strong>Distance Range:</strong> {
                                         distance <= 1000 ? '< 1km' :
                                         distance <= 2000 ? '1-2km' :
@@ -184,6 +200,108 @@ const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes, p
 
     const polylines = getRoutePolylines(filteredRoutes);
 
+    // Function to get color based on cluster ID
+    const getClusterColor = (clusterId: string | undefined): string => {
+        if (!clusterId) return '#808080'; // Gray for undefined
+        const colors = ['#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF'];
+        const index = Number(clusterId) % colors.length;
+        return colors[index];
+    };
+
+    // Function to find payout info based on route and hexagon
+    const findPayoutInfo = (route: RouteData, hexagonId: string) => {
+        if (Array.isArray(payoutCalculations)) {
+            return (payoutCalculations as Array<PayoutCalculation | DirectDistancePayout | FlatDistancePayout>).find(calc => 
+                calc.dcCode === route.dc_code &&
+                calc.feNumber === route.fe_number &&
+                calc.date === route.date &&
+                'hexagonId' in calc && calc.hexagonId === hexagonId
+            );
+        }
+        return undefined;
+    };
+
+    // Function to get popup content
+    const getPopupContent = (
+        clusterInfo: Array<{
+            route_id: string;
+            dc_code: string;
+            date: string;
+            cluster_id: string | undefined;
+            shipment_count: number;
+            rto_percentage: number;
+            payout: number;
+            payout_per_shipment: number;
+        }>,
+        totalShipments: number,
+        totalPayouts: number,
+        averageRtoPercentage: number,
+        displayClusterId: string,
+        centroid: Centroid
+    ): string => {
+        // Find the payout calculation for this hexagon
+        const payoutInfo = (payoutCalculations as Array<PayoutCalculation | DirectDistancePayout | FlatDistancePayout>).find(calc => 
+            'hexagonId' in calc && 
+            String(calc.hexagonId) === String(centroid.hexagon_id)
+        );
+
+        let payoutDisplay = '';
+        if (payoutInfo) {
+            if ('clusterId' in payoutInfo) {
+                // Route view - show cluster-based payouts
+                const clusterPayout = payoutInfo as PayoutCalculation;
+                const rtoAdjustedPayoutPerShipment = totalShipments > 0 ? 
+                    (clusterPayout.totalEarnings / totalShipments) / (1 - (averageRtoPercentage / 100)) : 0;
+                payoutDisplay = `
+                    <strong>Total Payouts:</strong> ₹${clusterPayout.totalEarnings.toFixed(2)}<br />
+                    <strong>RTO-Adjusted Payout/Shipment:</strong> ₹${rtoAdjustedPayoutPerShipment.toFixed(2)}<br />
+                `;
+            } else if ('directDistance' in payoutInfo) {
+                // Direct distance view - show direct distance payouts
+                const directPayout = payoutInfo as DirectDistancePayout;
+                const rtoAdjustedPayoutPerShipment = totalShipments > 0 ? 
+                    (directPayout.totalEarnings / totalShipments) / (1 - (averageRtoPercentage / 100)) : 0;
+                payoutDisplay = `
+                    <strong>Total Payouts:</strong> ₹${directPayout.totalEarnings.toFixed(2)}<br />
+                    <strong>RTO-Adjusted Payout/Shipment:</strong> ₹${rtoAdjustedPayoutPerShipment.toFixed(2)}<br />
+                    <strong>Direct Distance:</strong> ${directPayout.directDistance.toFixed(2)}m<br />
+                `;
+            } else {
+                // Flat distance view - show flat distance payouts
+                const flatPayout = payoutInfo as FlatDistancePayout;
+                const rtoAdjustedPayoutPerShipment = totalShipments > 0 ? 
+                    (flatPayout.totalEarnings / totalShipments) / (1 - (averageRtoPercentage / 100)) : 0;
+                payoutDisplay = `
+                    <strong>Total Payouts:</strong> ₹${flatPayout.totalEarnings.toFixed(2)}<br />
+                    <strong>RTO-Adjusted Payout/Shipment:</strong> ₹${rtoAdjustedPayoutPerShipment.toFixed(2)}<br />
+                `;
+            }
+        }
+
+        return `
+            <div>
+                <strong>Cluster ID:</strong> ${displayClusterId}<br />
+                <strong>Hexagon ID:</strong> ${centroid.hexagon_id}<br />
+                <strong>Location:</strong> [${centroid.lat.toFixed(5)}, ${centroid.lng.toFixed(5)}]<br />
+                <strong>Total Shipments:</strong> ${totalShipments}<br />
+                <strong>RTO %:</strong> ${averageRtoPercentage.toFixed(2)}%<br />
+                ${payoutDisplay}
+                <hr />
+                <strong>Appears in routes:</strong><br />
+                <ul>
+                    ${clusterInfo.map(info => 
+                        `<li>
+                            FE: ${info.route_id} (DC: ${info.dc_code})<br />
+                            Date: ${info.date}<br />
+                            Cluster: ${info.cluster_id || 'N/A'}<br />
+                            Shipments: ${info.shipment_count}
+                        </li>`
+                    ).join('')}
+                </ul>
+            </div>
+        `;
+    };
+
     return (
         <Box height="100%" width="100%" position="relative">
             <Box sx={{ 
@@ -199,17 +317,21 @@ const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes, p
                 <ButtonGroup>
                     <Button 
                         variant={viewMode === 'route' ? 'contained' : 'outlined'}
-                        onClick={() => setViewMode('route')}
                         size="small"
                     >
                         Route View
                     </Button>
                     <Button 
                         variant={viewMode === 'direct' ? 'contained' : 'outlined'}
-                        onClick={() => setViewMode('direct')}
                         size="small"
                     >
                         Direct View
+                    </Button>
+                    <Button 
+                        variant={viewMode === 'flat' ? 'contained' : 'outlined'}
+                        size="small"
+                    >
+                        Flat View
                     </Button>
                 </ButtonGroup>
             </Box>
@@ -223,31 +345,27 @@ const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes, p
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
 
-                {/* DC Locations - Only show selected DCs */}
-                {locationData.dcLocations
-                    .filter(dc => {
-                        // Get unique DC codes from filtered routes
-                        const selectedDcCodes = new Set(filteredRoutes.map(route => route.dc_code));
-                        return selectedDcCodes.has(dc.dc_code);
-                    })
-                    .map((dc, idx) => (
-                        <Marker
-                            key={`dc-${idx}`}
-                            position={[dc.lat, dc.lng]}
-                        >
-                            <Popup>
-                                <Typography variant="body2">
-                                    <strong>DC:</strong> {dc.dc_code}<br />
-                                    <strong>City:</strong> {dc.city}
-                                </Typography>
-                            </Popup>
-                        </Marker>
-                    ))}
+                {/* Draw DC locations */}
+                {locationData.dcLocations.map((dc, idx) => (
+                    <Marker
+                        key={`dc-${idx}`}
+                        position={[dc.lat, dc.lng]}
+                        icon={defaultIcon}
+                    >
+                        <Popup>
+                            <Typography variant="body2">
+                                <strong>DC Code:</strong> {dc.dc_code}<br />
+                                <strong>City:</strong> {dc.city}<br />
+                                <strong>Location:</strong> [{dc.lat.toFixed(6)}, {dc.lng.toFixed(6)}]
+                            </Typography>
+                        </Popup>
+                    </Marker>
+                ))}
 
-                {/* Route Polylines */}
+                {/* Draw route polylines */}
                 {polylines}
 
-                {/* Hexagon Centroids */}
+                {/* Draw hexagon centroids */}
                 {visibleCentroids.map((centroid, idx) => {
                     // Get routes that include this hexagon
                     const routesWithHexagon = filteredRoutes.filter(route => 
@@ -266,28 +384,47 @@ const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes, p
                             String(a.hexagon_index) === centroid.hexagon_id
                         );
                         
-                        // Find shipment count for this route and hexagon
-                        const shipmentCount = locationData.hexagonCustomerMapping.find(mapping => 
+                        // Find shipment count and RTO percentage for this route and hexagon
+                        const hexagonMapping = locationData.hexagonCustomerMapping.find(mapping => 
                             String(mapping.hexagon_index) === String(centroid.hexagon_id) &&
                             mapping.fe_number === route.fe_number &&
                             mapping.ofd_date === route.date
-                        )?.delivery_count || 0;
+                        );
+                        
+                        const shipmentCount = hexagonMapping?.delivery_count || 0;
+                        const rtoPercentage = hexagonMapping?.rto_percentage || 0;
 
+                        // Find payout calculation for this route
+                        const payoutInfo = (payoutCalculations as Array<PayoutCalculation | DirectDistancePayout | FlatDistancePayout>).find(calc => 
+                            'hexagonId' in calc && 
+                            calc.hexagonId === String(activity?.hexagon_index) &&
+                            calc.dcCode === route.dc_code &&
+                            calc.feNumber === route.fe_number &&
+                            calc.date === route.date
+                        );
+
+                        // Calculate payout for this specific hexagon's shipments
+                        const hexagonPayout = payoutInfo ? payoutInfo.totalEarnings : 0;
 
                         return {
                             route_id: route.fe_number,
                             dc_code: route.dc_code,
                             date: route.date,
                             cluster_id: activity?.cluster_id,
-                            shipment_count: shipmentCount
+                            shipment_count: shipmentCount,
+                            rto_percentage: rtoPercentage,
+                            payout: hexagonPayout,
+                            payout_per_shipment: shipmentCount > 0 ? hexagonPayout / shipmentCount : 0
                         };
                     });
 
-                    // Calculate total shipment count for this hexagon
-                    // const totalShipments = locationData.hexagonCustomerMapping
-                    //     .filter(mapping => String(mapping.hexagon_index) === String(centroid.hexagon_id))
-                    //     .reduce((sum, mapping) => sum + (mapping.delivery_count || 0), 0);
-
+                    // Calculate total payouts and shipments for this hexagon
+                    const totalShipments = clusterInfo.reduce((sum, info) => sum + info.shipment_count, 0);
+                    const totalPayouts = clusterInfo.reduce((sum, info) => sum + info.payout, 0);
+                    
+                    // Calculate average RTO percentage for this hexagon
+                    const averageRtoPercentage = clusterInfo.length > 0 ? 
+                        clusterInfo.reduce((sum, info) => sum + info.rto_percentage, 0) / clusterInfo.length : 0;
                     
                     // Check if this hexagon has multiple different cluster IDs
                     const hasMultipleClusterIds = centroid.all_cluster_ids && centroid.all_cluster_ids.length > 1;
@@ -300,8 +437,18 @@ const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes, p
                     // Color based on the first route's cluster ID
                     const displayColor = hasMultipleClusterIds
                         ? '#FF00FF' // Magenta for multiple clusters  
-                        : (centroid.cluster_id ? `hsl(${(centroid.cluster_id * 30) % 360}, 70%, 50%)` : 'blue');
+                        : (centroid.cluster_id ? `hsl(${(Number(centroid.cluster_id) * 30) % 360}, 70%, 50%)` : 'blue');
                     
+                    // Create popup content
+                    const popupContent = getPopupContent(
+                        clusterInfo, 
+                        totalShipments, 
+                        totalPayouts, 
+                        averageRtoPercentage,
+                        displayClusterId,
+                        centroid
+                    );
+
                     return (
                         <CircleMarker
                             key={`centroid-${idx}`}
@@ -318,33 +465,7 @@ const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes, p
                                 <strong>{displayClusterId}</strong>
                             </Tooltip>
                             <Popup>
-                                <Typography variant="body2" component="div">
-                                    {hasMultipleClusterIds ? (
-                                        <strong>Multiple Cluster IDs: {centroid.all_cluster_ids.join(', ')}</strong>
-                                    ) : (
-                                        <strong>Cluster ID: {centroid.cluster_id || 'N/A'}</strong>
-                                    )}<br />
-                                    <strong>Hexagon ID:</strong> {centroid.hexagon_id}<br />
-                                    <strong>Location:</strong> [{centroid.lat.toFixed(5)}, {centroid.lng.toFixed(5)}]<br />
-                                    {/* <strong>Total Shipments:</strong> {totalShipments} */}
-                                    
-                                    {clusterInfo.length > 0 && (
-                                        <>
-                                            <hr />
-                                            <strong>Appears in routes:</strong>
-                                            <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
-                                                {clusterInfo.map((info, i) => (
-                                                    <li key={i}>
-                                                        FE: {info.route_id} (DC: {info.dc_code})<br />
-                                                        Date: {info.date}<br />
-                                                        Cluster: {info.cluster_id || 'N/A'}<br />
-                                                        Shipments: {info.shipment_count}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </>
-                                    )}
-                                </Typography>
+                                <Typography variant="body2" component="div" dangerouslySetInnerHTML={{ __html: popupContent }} />
                             </Popup>
                         </CircleMarker>
                     );

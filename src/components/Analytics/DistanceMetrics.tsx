@@ -12,8 +12,8 @@ const DistanceMetrics: React.FC<DistanceMetricsProps> = ({ metrics }) => {
     };
 
     return (
-        <Box display="flex" gap={2}>
-            <Box flex="1">
+        <Box display="flex" gap={2} flexWrap="wrap">
+            <Box flex="1" minWidth="200px">
                 <Card raised>
                     <CardContent>
                         <Typography variant="h6" color="primary" gutterBottom>
@@ -26,7 +26,7 @@ const DistanceMetrics: React.FC<DistanceMetricsProps> = ({ metrics }) => {
                 </Card>
             </Box>
 
-            <Box flex="1">
+            <Box flex="1" minWidth="200px">
                 <Card raised>
                     <CardContent>
                         <Typography variant="h6" color="primary" gutterBottom>
@@ -39,7 +39,7 @@ const DistanceMetrics: React.FC<DistanceMetricsProps> = ({ metrics }) => {
                 </Card>
             </Box>
 
-            <Box flex="1">
+            <Box flex="1" minWidth="200px">
                 <Card raised>
                     <CardContent>
                         <Typography variant="h6" color="primary" gutterBottom>
@@ -47,6 +47,32 @@ const DistanceMetrics: React.FC<DistanceMetricsProps> = ({ metrics }) => {
                         </Typography>
                         <Typography variant="h4">
                             {metrics.feAverage ? formatDistance(metrics.feAverage) : 'N/A'}
+                        </Typography>
+                    </CardContent>
+                </Card>
+            </Box>
+
+            <Box flex="1" minWidth="200px">
+                <Card raised>
+                    <CardContent>
+                        <Typography variant="h6" color="primary" gutterBottom>
+                            DC to Hex Average
+                        </Typography>
+                        <Typography variant="h4">
+                            {metrics.dcToHexAverage ? formatDistance(metrics.dcToHexAverage) : 'N/A'}
+                        </Typography>
+                    </CardContent>
+                </Card>
+            </Box>
+
+            <Box flex="1" minWidth="200px">
+                <Card raised>
+                    <CardContent>
+                        <Typography variant="h6" color="primary" gutterBottom>
+                            Hex to Hex Average
+                        </Typography>
+                        <Typography variant="h4">
+                            {metrics.hexToHexAverage ? formatDistance(metrics.hexToHexAverage) : 'N/A'}
                         </Typography>
                     </CardContent>
                 </Card>

@@ -8,7 +8,9 @@ export function calculateAverages(data: RouteData[]): DistanceMetrics {
             totalDistance: 0,
             cityAverage: undefined,
             dcAverage: undefined,
-            feAverage: undefined
+            feAverage: undefined,
+            dcToHexAverage: undefined,
+            hexToHexAverage: undefined
         };
     }
 
@@ -51,12 +53,43 @@ export function calculateAverages(data: RouteData[]): DistanceMetrics {
     const feAverage = Array.from(feMap.values())
         .reduce((sum, { totalDistance, count }) => sum + (totalDistance / count), 0) / feMap.size;
 
+    // Calculate DC to Hex average
+    let totalDcToHexDistance = 0;
+    let totalDcToHexCount = 0;
+    data.forEach(route => {
+        route.activities.forEach(activity => {
+            if (activity.type === 'delivery' && activity.distance_from_dc) {
+                totalDcToHexDistance += activity.distance_from_dc;
+                totalDcToHexCount++;
+            }
+        });
+    });
+    const dcToHexAverage = totalDcToHexCount > 0 ? totalDcToHexDistance / totalDcToHexCount : undefined;
+
+    // Calculate Hex to Hex average
+    let totalHexToHexDistance = 0;
+    let totalHexToHexCount = 0;
+    data.forEach(route => {
+        const activities = route.activities.sort((a, b) => a.sequence - b.sequence);
+        for (let i = 0; i < activities.length - 1; i++) {
+            const current = activities[i];
+            const next = activities[i + 1];
+            if (current.type === 'delivery' && next.type === 'delivery' && current.distance_from_prev) {
+                totalHexToHexDistance += current.distance_from_prev;
+                totalHexToHexCount++;
+            }
+        }
+    });
+    const hexToHexAverage = totalHexToHexCount > 0 ? totalHexToHexDistance / totalHexToHexCount : undefined;
+
     return {
         avgDistance,
         totalRoutes: data.length,
         totalDistance,
         cityAverage,
         dcAverage,
-        feAverage
+        feAverage,
+        dcToHexAverage,
+        hexToHexAverage
     };
 }

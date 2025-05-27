@@ -28,3 +28,5 @@ yarn-error.log*
 *.swp
 *.swo
 .vercel
+.pre-commit-config.yaml
+trufflehog/

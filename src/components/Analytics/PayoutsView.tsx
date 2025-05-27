@@ -52,7 +52,7 @@ interface DirectPayoutViewProps {
 interface PayoutsViewProps {
     routeData: RouteData[];
     locationData: LocationData;
-    onPayoutCalculated?: (payouts: PayoutSummary[], calculations?: PayoutCalculation[]) => void;
+    onPayoutCalculated?: (payouts: PayoutSummary[], calculations: PayoutCalculation[] | DirectDistancePayout[] | FlatDistancePayout[]) => void;
 }
 
 interface ThresholdConfig {
@@ -140,6 +140,37 @@ interface DirectDistancePayout {
     rtoPercentage: number;
 }
 
+interface FlatDistancePayoutViewProps {
+    routeData: RouteData[];
+    locationData: LocationData;
+    thresholds: FlatDistanceThresholdConfig;
+    onThresholdsChange: (thresholds: FlatDistanceThresholdConfig) => void;
+    onPayoutCalculated: (payouts: PayoutSummary[], calculations: FlatDistancePayout[]) => void;
+}
+
+interface FlatDistanceThresholdConfig {
+    distanceThreshold: number;  // in meters
+    flatIncentive: number;     // flat incentive amount in rupees
+    baseShipmentPrice: number; // base price per shipment
+}
+
+interface FlatDistancePayout {
+    hexagonId: string;
+    dcCode: string;
+    feNumber: string;
+    date: string;
+    totalShipments: number;
+    directDistance: number;
+    excessDistance: number;
+    flatIncentive: number;
+    baseEarnings: number;
+    totalEarnings: number;
+    earningsPerShipment: number;
+    earningsPerShipmentPreRto: number;
+    earningsPerShipmentPostRto: number;
+    rtoPercentage: number;
+}
+
 const DEFAULT_THRESHOLDS: ThresholdConfig = {
     dcToHexThreshold: 5000,  // 5 km
     hexToHexThreshold: 2000, // 2 km
@@ -156,16 +187,99 @@ const DEFAULT_DIRECT_DISTANCE_THRESHOLDS: DirectDistanceThresholdConfig = {
     baseShipmentPrice: 50,    // Rs 50 per shipment
 };
 
+const DEFAULT_FLAT_DISTANCE_THRESHOLDS: FlatDistanceThresholdConfig = {
+    distanceThreshold: 5000,  // 5 km
+    flatIncentive: 100,      // ₹100 flat incentive
+    baseShipmentPrice: 50,    // ₹50 per shipment
+};
+
+const MAX_RTO_PERCENTAGE = 30; // Cap RTO at 30%
+
 const PayoutsView: React.FC<PayoutsViewProps> = ({ routeData, locationData, onPayoutCalculated }) => {
-    const [viewMode, setViewMode] = React.useState<'cluster' | 'direct' | 'comparison'>('cluster');
+    const [viewMode, setViewMode] = React.useState<'cluster' | 'direct' | 'flat' | 'comparison'>('cluster');
     const [clusterPayouts, setClusterPayouts] = React.useState<PayoutSummary[]>([]);
     const [directPayouts, setDirectPayouts] = React.useState<PayoutSummary[]>([]);
+    const [flatPayouts, setFlatPayouts] = React.useState<PayoutSummary[]>([]);
     const [payoutCalculations, setPayoutCalculations] = React.useState<PayoutCalculation[]>([]);
     const [directPayoutCalculations, setDirectPayoutCalculations] = React.useState<DirectDistancePayout[]>([]);
+    const [flatPayoutCalculations, setFlatPayoutCalculations] = React.useState<FlatDistancePayout[]>([]);
     
-    // Lift threshold configurations to parent
-    const [clusterThresholds, setClusterThresholds] = React.useState<ThresholdConfig>(DEFAULT_THRESHOLDS);
-    const [directThresholds, setDirectThresholds] = React.useState<DirectDistanceThresholdConfig>(DEFAULT_DIRECT_DISTANCE_THRESHOLDS);
+    // Initialize thresholds from localStorage or defaults
+    const [clusterThresholds, setClusterThresholds] = React.useState<ThresholdConfig>(() => {
+        const stored = localStorage.getItem('clusterThresholds');
+        return stored ? JSON.parse(stored) : DEFAULT_THRESHOLDS;
+    });
+
+    const [directThresholds, setDirectThresholds] = React.useState<DirectDistanceThresholdConfig>(() => {
+        const stored = localStorage.getItem('directThresholds');
+        return stored ? JSON.parse(stored) : DEFAULT_DIRECT_DISTANCE_THRESHOLDS;
+    });
+
+    const [flatThresholds, setFlatThresholds] = React.useState<FlatDistanceThresholdConfig>(() => {
+        const stored = localStorage.getItem('flatThresholds');
+        return stored ? JSON.parse(stored) : DEFAULT_FLAT_DISTANCE_THRESHOLDS;
+    });
+
+    // Save thresholds to localStorage whenever they change
+    React.useEffect(() => {
+        localStorage.setItem('clusterThresholds', JSON.stringify(clusterThresholds));
+    }, [clusterThresholds]);
+
+    React.useEffect(() => {
+        localStorage.setItem('directThresholds', JSON.stringify(directThresholds));
+    }, [directThresholds]);
+
+    React.useEffect(() => {
+        localStorage.setItem('flatThresholds', JSON.stringify(flatThresholds));
+    }, [flatThresholds]);
+
+    // Calculate payouts for all view modes when component mounts
+    React.useEffect(() => {
+        // Calculate cluster-based payouts
+        const clusterView = (
+            <ClusterBasedPayoutView 
+                routeData={routeData} 
+                locationData={locationData}
+                thresholds={clusterThresholds}
+                onThresholdsChange={setClusterThresholds}
+                onPayoutCalculated={(payouts: PayoutSummary[], calculations: PayoutCalculation[]) => {
+                    setClusterPayouts(payouts);
+                    setPayoutCalculations(calculations);
+                    onPayoutCalculated?.(payouts, calculations);
+                }}
+            />
+        );
+
+        // Calculate direct distance payouts
+        const directView = (
+            <DirectDistancePayoutView 
+                routeData={routeData} 
+                locationData={locationData}
+                thresholds={directThresholds}
+                onThresholdsChange={setDirectThresholds}
+                onPayoutCalculated={(payouts: PayoutSummary[], calculations: DirectDistancePayout[]) => {
+                    setDirectPayouts(payouts);
+                    setDirectPayoutCalculations(calculations);
+                    onPayoutCalculated?.(payouts, calculations);
+                }}
+            />
+        );
+
+        // Calculate flat distance payouts
+        const flatView = (
+            <FlatDistancePayoutView
+                routeData={routeData}
+                locationData={locationData}
+                thresholds={flatThresholds}
+                onThresholdsChange={setFlatThresholds}
+                onPayoutCalculated={(payouts: PayoutSummary[], calculations: FlatDistancePayout[]) => {
+                    setFlatPayouts(payouts);
+                    setFlatPayoutCalculations(calculations);
+                    onPayoutCalculated?.(payouts, calculations);
+                }}
+            />
+        );
+    }, [routeData, locationData, clusterThresholds, directThresholds, flatThresholds, onPayoutCalculated]);
 
     return (
         <Box>
@@ -173,6 +287,7 @@ const PayoutsView: React.FC<PayoutsViewProps> = ({ routeData, locationData, onPa
                 <Tabs value={viewMode} onChange={(_, newValue) => setViewMode(newValue)}>
                     <Tab label="Cluster-based Payouts" value="cluster" />
                     <Tab label="Direct Distance Payouts" value="direct" />
+                    <Tab label="Flat Distance Payouts" value="flat" />
                     <Tab label="System Comparison" value="comparison" />
                 </Tabs>
             </Box>
@@ -198,15 +313,30 @@ const PayoutsView: React.FC<PayoutsViewProps> = ({ routeData, locationData, onPa
                     onPayoutCalculated={(payouts: PayoutSummary[], calculations: DirectDistancePayout[]) => {
                         setDirectPayouts(payouts);
                         setDirectPayoutCalculations(calculations);
+                        onPayoutCalculated?.(payouts, calculations);
+                    }}
+                />
+            ) : viewMode === 'flat' ? (
+                <FlatDistancePayoutView
+                    routeData={routeData}
+                    locationData={locationData}
+                    thresholds={flatThresholds}
+                    onThresholdsChange={setFlatThresholds}
+                    onPayoutCalculated={(payouts: PayoutSummary[], calculations: FlatDistancePayout[]) => {
+                        setFlatPayouts(payouts);
+                        setFlatPayoutCalculations(calculations);
+                        onPayoutCalculated?.(payouts, calculations);
                     }}
                 />
             ) : (
-                <PayoutComparison 
+                <PayoutComparison
                     clusterPayouts={clusterPayouts}
                     directPayouts={directPayouts}
+                    flatPayouts={flatPayouts}
                     routeData={routeData}
                     payoutCalculations={payoutCalculations}
                     directPayoutCalculations={directPayoutCalculations}
+                    flatPayoutCalculations={flatPayoutCalculations}
                 />
             )}
         </Box>
@@ -577,7 +707,8 @@ const ClusterBasedPayoutView: React.FC<ClusterPayoutViewProps> = ({
                 const totalEarnings = baseEarnings + totalIncentive;
                 
                 // Apply RTO percentage adjustment only to incentives
-                const adjustedIncentive = totalIncentive / (1 - (clusterRtoPercentage / 100));
+                const cappedRtoPercentage = Math.min(rtoPercentage, MAX_RTO_PERCENTAGE);
+                const adjustedIncentive = totalIncentive / (1 - (cappedRtoPercentage / 100));
                 const earningsPerShipmentPreRto = totalShipments > 0 ? 
                     (baseEarnings + totalIncentive) / totalShipments : 0;
                 const earningsPerShipmentPostRto = totalShipments > 0 ? 
@@ -1386,20 +1517,359 @@ const DirectDistancePayoutView: React.FC<DirectPayoutViewProps> = ({
     );
 };
 
+const FlatDistancePayoutView: React.FC<FlatDistancePayoutViewProps> = ({ 
+    routeData, 
+    locationData, 
+    thresholds,
+    onThresholdsChange,
+    onPayoutCalculated 
+}) => {
+    const [payoutCalculations, setPayoutCalculations] = React.useState<FlatDistancePayout[]>([]);
+    const [payoutSummary, setPayoutSummary] = React.useState<PayoutSummary[]>([]);
+
+    const calculateFlatDistancePayouts = React.useCallback(() => {
+        const calculations: FlatDistancePayout[] = [];
+        const processedPairs = new Set<string>();
+
+        routeData.forEach(route => {
+            route.activities.forEach(activity => {
+                if (activity.type !== 'delivery' || !activity.hexagon_index || !activity.distance_from_dc) return;
+
+                const pairKey = `${route.fe_number}-${route.date}-${activity.hexagon_index}`;
+                if (processedPairs.has(pairKey)) return;
+                processedPairs.add(pairKey);
+
+                // Get shipments and RTO percentage for this hexagon
+                const hexagonMapping = locationData.hexagonCustomerMapping
+                    .find(mapping => 
+                        String(mapping.hexagon_index) === String(activity.hexagon_index) &&
+                        mapping.dc_code === route.dc_code &&
+                        mapping.fe_number === route.fe_number &&
+                        mapping.ofd_date === route.date
+                    );
+
+                const totalShipments = hexagonMapping?.delivery_count || 0;
+                const rtoPercentage = hexagonMapping?.rto_percentage || 0;
+
+                // Use the pre-calculated distance from DC
+                const directDistance = activity.distance_from_dc;
+                const excessDistance = Math.max(0, directDistance - thresholds.distanceThreshold);
+                const flatIncentive = excessDistance > 0 ? thresholds.flatIncentive : 0;
+                const baseEarnings = totalShipments * thresholds.baseShipmentPrice;
+                
+                // Apply RTO percentage adjustment only to incentives
+                const cappedRtoPercentage = Math.min(rtoPercentage, MAX_RTO_PERCENTAGE);
+                const adjustedIncentive = flatIncentive / (1 - (cappedRtoPercentage / 100));
+                const totalEarningsPreRto = baseEarnings + flatIncentive;
+                const totalEarningsPostRto = baseEarnings + adjustedIncentive;
+                const earningsPerShipmentPreRto = totalShipments > 0 ? totalEarningsPreRto / totalShipments : 0;
+                const earningsPerShipmentPostRto = totalShipments > 0 ? totalEarningsPostRto / totalShipments : 0;
+
+                calculations.push({
+                    hexagonId: String(activity.hexagon_index),
+                    dcCode: route.dc_code,
+                    feNumber: route.fe_number,
+                    date: route.date,
+                    totalShipments,
+                    directDistance,
+                    excessDistance,
+                    flatIncentive,
+                    baseEarnings,
+                    totalEarnings: totalEarningsPostRto,
+                    earningsPerShipment: earningsPerShipmentPostRto,
+                    earningsPerShipmentPreRto,
+                    earningsPerShipmentPostRto,
+                    rtoPercentage
+                });
+            });
+        });
+
+        // Calculate summary statistics
+        const summary = new Map<string, PayoutSummary>();
+        
+        calculations.forEach(calc => {
+            if (!summary.has(calc.dcCode)) {
+                summary.set(calc.dcCode, {
+                    dcCode: calc.dcCode,
+                    totalShipments: 0,
+                    totalIncentivesPreRto: 0,
+                    totalIncentivesPostRto: 0,
+                    totalBaseEarnings: 0,
+                    totalEarningsPreRto: 0,
+                    totalEarningsPostRto: 0,
+                    avgEarningsPerShipmentPreRto: 0,
+                    avgEarningsPerShipmentPostRto: 0,
+                    pilots: {}
+                });
+            }
+
+            const dcSummary = summary.get(calc.dcCode)!;
+            dcSummary.totalShipments += calc.totalShipments;
+            dcSummary.totalIncentivesPreRto += calc.flatIncentive;
+            dcSummary.totalIncentivesPostRto += calc.flatIncentive / (1 - (calc.rtoPercentage / 100));
+            dcSummary.totalBaseEarnings += calc.baseEarnings;
+            dcSummary.totalEarningsPreRto += calc.baseEarnings + calc.flatIncentive;
+            dcSummary.totalEarningsPostRto += calc.baseEarnings + (calc.flatIncentive / (1 - (calc.rtoPercentage / 100)));
+
+            if (!dcSummary.pilots[calc.feNumber]) {
+                dcSummary.pilots[calc.feNumber] = {
+                    shipments: 0,
+                    incentivesPreRto: 0,
+                    incentivesPostRto: 0,
+                    baseEarnings: 0,
+                    totalEarningsPreRto: 0,
+                    totalEarningsPostRto: 0,
+                    earningsPerShipmentPreRto: 0,
+                    earningsPerShipmentPostRto: 0
+                };
+            }
+
+            const pilotSummary = dcSummary.pilots[calc.feNumber];
+            pilotSummary.shipments += calc.totalShipments;
+            pilotSummary.incentivesPreRto += calc.flatIncentive;
+            pilotSummary.incentivesPostRto += calc.flatIncentive / (1 - (calc.rtoPercentage / 100));
+            pilotSummary.baseEarnings += calc.baseEarnings;
+            pilotSummary.totalEarningsPreRto += calc.baseEarnings + calc.flatIncentive;
+            pilotSummary.totalEarningsPostRto += calc.baseEarnings + (calc.flatIncentive / (1 - (calc.rtoPercentage / 100)));
+            pilotSummary.earningsPerShipmentPreRto = pilotSummary.shipments > 0 ?
+                pilotSummary.totalEarningsPreRto / pilotSummary.shipments : 0;
+            pilotSummary.earningsPerShipmentPostRto = pilotSummary.shipments > 0 ?
+                pilotSummary.totalEarningsPostRto / pilotSummary.shipments : 0;
+        });
+
+        // Calculate averages
+        summary.forEach(dc => {
+            dc.avgEarningsPerShipmentPreRto = dc.totalShipments > 0 ?
+                dc.totalEarningsPreRto / dc.totalShipments : 0;
+            dc.avgEarningsPerShipmentPostRto = dc.totalShipments > 0 ?
+                dc.totalEarningsPostRto / dc.totalShipments : 0;
+        });
+
+        setPayoutSummary(Array.from(summary.values()));
+        setPayoutCalculations(calculations);
+        onPayoutCalculated?.(Array.from(summary.values()), calculations);
+    }, [routeData, locationData, thresholds, onPayoutCalculated]);
+
+    React.useEffect(() => {
+        calculateFlatDistancePayouts();
+    }, [calculateFlatDistancePayouts]);
+
+    const handleThresholdChange = (field: keyof FlatDistanceThresholdConfig) => (event: React.ChangeEvent<HTMLInputElement>) => {
+        const value = parseFloat(event.target.value);
+        if (!isNaN(value)) {
+            onThresholdsChange({
+                ...thresholds,
+                [field]: value
+            });
+        }
+    };
+
+    // Add formatter function
+    const formatTooltipValue = (value: number) => `₹${value.toFixed(2)}`;
+
+    return (
+        <Box p={3}>
+            <Grid container spacing={3}>
+                <Grid item xs={12}>
+                    <Paper sx={{ p: 2, mb: 2 }}>
+                        <Typography variant="h6" gutterBottom>Flat Distance Configuration</Typography>
+                        <Grid container spacing={2}>
+                            <Grid item xs={4}>
+                                <TextField
+                                    label="Base Price per Shipment (₹)"
+                                    type="number"
+                                    value={thresholds.baseShipmentPrice}
+                                    onChange={handleThresholdChange('baseShipmentPrice')}
+                                    fullWidth
+                                />
+                            </Grid>
+                            <Grid item xs={4}>
+                                <TextField
+                                    label="Distance Threshold (m)"
+                                    type="number"
+                                    value={thresholds.distanceThreshold}
+                                    onChange={handleThresholdChange('distanceThreshold')}
+                                    fullWidth
+                                />
+                            </Grid>
+                            <Grid item xs={4}>
+                                <TextField
+                                    label="Flat Incentive (₹)"
+                                    type="number"
+                                    value={thresholds.flatIncentive}
+                                    onChange={handleThresholdChange('flatIncentive')}
+                                    fullWidth
+                                />
+                            </Grid>
+                        </Grid>
+                    </Paper>
+                </Grid>
+
+                <Grid item xs={12}>
+                    <Paper sx={{ p: 2, mb: 2 }}>
+                        <Typography variant="h6" gutterBottom>DC Level Summary</Typography>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={payoutSummary}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="dcCode" />
+                                <YAxis tickFormatter={(value) => `₹${value.toFixed(2)}`} />
+                                <Tooltip formatter={formatTooltipValue} />
+                                <Legend />
+                                <Bar dataKey="totalBaseEarnings" name="Base Earnings" fill="#8884d8" />
+                                <Bar dataKey="totalIncentivesPreRto" name="Incentives (Pre-RTO)" fill="#82ca9d" />
+                                <Bar dataKey="totalIncentivesPostRto" name="Incentives (Post-RTO)" fill="#ffc658" />
+                                <Bar dataKey="avgEarningsPerShipmentPreRto" name="Avg Earnings/Shipment (Pre-RTO)" fill="#ff8042" />
+                                <Bar dataKey="avgEarningsPerShipmentPostRto" name="Avg Earnings/Shipment (Post-RTO)" fill="#00C49F" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </Paper>
+                </Grid>
+
+                <Grid item xs={12}>
+                    <Typography variant="h6" gutterBottom>Pilot Level Summary</Typography>
+                    <Grid container spacing={2}>
+                        {payoutSummary.map(dc => 
+                            Object.entries(dc.pilots).map(([feNumber, pilot]) => (
+                                <Grid item xs={3} key={`${dc.dcCode}-${feNumber}`}>
+                                    <Card>
+                                        <CardContent>
+                                            <Typography variant="h6" color="primary">
+                                                FE: {feNumber}
+                                            </Typography>
+                                            <Typography variant="subtitle1" color="textSecondary">
+                                                DC: {dc.dcCode}
+                                            </Typography>
+                                            <Typography>
+                                                Shipments: {pilot.shipments}
+                                            </Typography>
+                                            <Typography>
+                                                Base Earnings: ₹{pilot.baseEarnings.toFixed(2)}
+                                            </Typography>
+                                            <Box sx={{ mt: 2, borderTop: '1px solid #eee', pt: 1 }}>
+                                                <Typography variant="subtitle2" color="primary">Pre-RTO</Typography>
+                                                <Typography>
+                                                    Incentives: ₹{pilot.incentivesPreRto.toFixed(2)}
+                                                </Typography>
+                                                <Typography>
+                                                    Total Earnings: ₹{pilot.totalEarningsPreRto.toFixed(2)}
+                                                </Typography>
+                                                <Typography>
+                                                    Per Shipment: ₹{pilot.earningsPerShipmentPreRto.toFixed(2)}
+                                                </Typography>
+                                            </Box>
+                                            <Box sx={{ mt: 2, borderTop: '1px solid #eee', pt: 1 }}>
+                                                <Typography variant="subtitle2" color="error">Post-RTO</Typography>
+                                                <Typography>
+                                                    Incentives: ₹{pilot.incentivesPostRto.toFixed(2)}
+                                                </Typography>
+                                                <Typography>
+                                                    Total Earnings: ₹{pilot.totalEarningsPostRto.toFixed(2)}
+                                                </Typography>
+                                                <Typography>
+                                                    Per Shipment: ₹{pilot.earningsPerShipmentPostRto.toFixed(2)}
+                                                </Typography>
+                                            </Box>
+                                        </CardContent>
+                                    </Card>
+                                </Grid>
+                            ))
+                        )}
+                    </Grid>
+                </Grid>
+
+                <Grid item xs={12}>
+                    <TableContainer component={Paper}>
+                        <Table>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell>Basic Info</TableCell>
+                                    <TableCell>Distance Info</TableCell>
+                                    <TableCell>Shipments & Base Pay</TableCell>
+                                    <TableCell>Flat Incentive</TableCell>
+                                    <TableCell>Total Earnings</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {payoutCalculations.map((calc, idx) => (
+                                    <TableRow key={`${calc.hexagonId}-${idx}`}>
+                                        <TableCell>
+                                            <Typography><strong>Hex ID:</strong> {calc.hexagonId}</Typography>
+                                            <Typography><strong>DC:</strong> {calc.dcCode}</Typography>
+                                            <Typography><strong>FE:</strong> {calc.feNumber}</Typography>
+                                            <Typography><strong>Date:</strong> {calc.date}</Typography>
+                                        </TableCell>
+                                        
+                                        <TableCell>
+                                            <Typography><strong>Direct Distance:</strong> {calc.directDistance.toFixed(2)}m</Typography>
+                                            {calc.excessDistance > 0 && (
+                                                <Typography color="error">
+                                                    <strong>Excess:</strong> {calc.excessDistance.toFixed(2)}m
+                                                </Typography>
+                                            )}
+                                        </TableCell>
+
+                                        <TableCell>
+                                            <Typography><strong>Shipments:</strong> {calc.totalShipments}</Typography>
+                                            <Typography><strong>Base Pay:</strong> ₹{calc.baseEarnings.toFixed(2)}</Typography>
+                                            <Typography><strong>Per Shipment:</strong> ₹{thresholds.baseShipmentPrice.toFixed(2)}</Typography>
+                                        </TableCell>
+
+                                        <TableCell>
+                                            {calc.flatIncentive > 0 ? (
+                                                <>
+                                                    <Typography>
+                                                        <strong>Flat Incentive:</strong> ₹{calc.flatIncentive.toFixed(2)}
+                                                    </Typography>
+                                                    <Typography color="textSecondary">
+                                                        (Applied when distance &gt; {thresholds.distanceThreshold}m)
+                                                    </Typography>
+                                                </>
+                                            ) : (
+                                                <Typography color="textSecondary">No flat incentive</Typography>
+                                            )}
+                                        </TableCell>
+
+                                        <TableCell>
+                                            <Box sx={{ borderBottom: '1px dashed #ccc', pb: 1, mb: 1 }}>
+                                                <Typography><strong>Before RTO:</strong></Typography>
+                                                <Typography>Total: ₹{(calc.baseEarnings + calc.flatIncentive).toFixed(2)}</Typography>
+                                                <Typography>Per Shipment: ₹{calc.earningsPerShipmentPreRto.toFixed(2)}</Typography>
+                                            </Box>
+                                            <Box>
+                                                <Typography><strong>After RTO ({calc.rtoPercentage.toFixed(1)}%):</strong></Typography>
+                                                <Typography>Total: ₹{calc.totalEarnings.toFixed(2)}</Typography>
+                                                <Typography>Per Shipment: ₹{calc.earningsPerShipmentPostRto.toFixed(2)}</Typography>
+                                            </Box>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </Grid>
+            </Grid>
+        </Box>
+    );
+};
+
 interface PayoutComparisonProps {
     clusterPayouts: PayoutSummary[];
     directPayouts: PayoutSummary[];
+    flatPayouts: PayoutSummary[];
     routeData: RouteData[];
     payoutCalculations: PayoutCalculation[];
     directPayoutCalculations: DirectDistancePayout[];
+    flatPayoutCalculations: FlatDistancePayout[];
 }
 
 const PayoutComparison: React.FC<PayoutComparisonProps> = ({ 
     clusterPayouts, 
     directPayouts, 
+    flatPayouts, 
     routeData,
     payoutCalculations,
-    directPayoutCalculations 
+    directPayoutCalculations,
+    flatPayoutCalculations 
 }) => {
     // Custom tooltip formatter for charts
     const formatTooltipValue = (value: number) => `₹${value.toFixed(2)}`;
@@ -1408,62 +1878,67 @@ const PayoutComparison: React.FC<PayoutComparisonProps> = ({
     const { dcComparison, feComparison, incentiveMetrics } = React.useMemo(() => {
         const dcData = clusterPayouts.map(clusterDC => {
             const directDC = directPayouts.find(d => d.dcCode === clusterDC.dcCode);
+            const flatDC = flatPayouts.find(d => d.dcCode === clusterDC.dcCode);
             return {
                 dcCode: clusterDC.dcCode,
                 // Pre-RTO values
                 clusterIncentivesPreRto: Number(clusterDC.totalIncentivesPreRto.toFixed(2)),
                 directIncentivesPreRto: Number(directDC?.totalIncentivesPreRto.toFixed(2) || "0"),
+                flatIncentivesPreRto: Number(flatDC?.totalIncentivesPreRto.toFixed(2) || "0"),
                 clusterTotalEarningsPreRto: Number(clusterDC.totalEarningsPreRto.toFixed(2)),
                 directTotalEarningsPreRto: Number(directDC?.totalEarningsPreRto.toFixed(2) || "0"),
+                flatTotalEarningsPreRto: Number(flatDC?.totalEarningsPreRto.toFixed(2) || "0"),
                 clusterAvgEarningsPreRto: Number(clusterDC.avgEarningsPerShipmentPreRto.toFixed(2)),
                 directAvgEarningsPreRto: Number(directDC?.avgEarningsPerShipmentPreRto.toFixed(2) || "0"),
+                flatAvgEarningsPreRto: Number(flatDC?.avgEarningsPerShipmentPreRto.toFixed(2) || "0"),
                 // Post-RTO values
                 clusterIncentivesPostRto: Number(clusterDC.totalIncentivesPostRto.toFixed(2)),
                 directIncentivesPostRto: Number(directDC?.totalIncentivesPostRto.toFixed(2) || "0"),
+                flatIncentivesPostRto: Number(flatDC?.totalIncentivesPostRto.toFixed(2) || "0"),
                 clusterTotalEarningsPostRto: Number(clusterDC.totalEarningsPostRto.toFixed(2)),
                 directTotalEarningsPostRto: Number(directDC?.totalEarningsPostRto.toFixed(2) || "0"),
+                flatTotalEarningsPostRto: Number(flatDC?.totalEarningsPostRto.toFixed(2) || "0"),
                 clusterAvgEarningsPostRto: Number(clusterDC.avgEarningsPerShipmentPostRto.toFixed(2)),
                 directAvgEarningsPostRto: Number(directDC?.avgEarningsPerShipmentPostRto.toFixed(2) || "0"),
+                flatAvgEarningsPostRto: Number(flatDC?.avgEarningsPerShipmentPostRto.toFixed(2) || "0")
             };
         });
 
         const feData = clusterPayouts.flatMap(clusterDC => {
             const directDC = directPayouts.find(d => d.dcCode === clusterDC.dcCode);
+            const flatDC = flatPayouts.find(d => d.dcCode === clusterDC.dcCode);
             return Object.entries(clusterDC.pilots).map(([feNumber, clusterPilot]) => {
                 const directPilot = directDC?.pilots[feNumber];
+                const flatPilot = flatDC?.pilots[feNumber];
                 return {
                     feNumber,
                     dcCode: clusterDC.dcCode,
                     // Pre-RTO values
                     clusterIncentivesPreRto: Number(clusterPilot.incentivesPreRto.toFixed(2)),
                     directIncentivesPreRto: Number(directPilot?.incentivesPreRto.toFixed(2) || "0"),
+                    flatIncentivesPreRto: Number(flatPilot?.incentivesPreRto.toFixed(2) || "0"),
                     clusterTotalEarningsPreRto: Number(clusterPilot.totalEarningsPreRto.toFixed(2)),
                     directTotalEarningsPreRto: Number(directPilot?.totalEarningsPreRto.toFixed(2) || "0"),
+                    flatTotalEarningsPreRto: Number(flatPilot?.totalEarningsPreRto.toFixed(2) || "0"),
                     // Post-RTO values
                     clusterIncentivesPostRto: Number(clusterPilot.incentivesPostRto.toFixed(2)),
                     directIncentivesPostRto: Number(directPilot?.incentivesPostRto.toFixed(2) || "0"),
+                    flatIncentivesPostRto: Number(flatPilot?.incentivesPostRto.toFixed(2) || "0"),
                     clusterTotalEarningsPostRto: Number(clusterPilot.totalEarningsPostRto.toFixed(2)),
                     directTotalEarningsPostRto: Number(directPilot?.totalEarningsPostRto.toFixed(2) || "0"),
+                    flatTotalEarningsPostRto: Number(flatPilot?.totalEarningsPostRto.toFixed(2) || "0")
                 };
             });
         });
 
-        // Calculate metrics for cluster-based system
+        // Calculate metrics for each system
         const clusterMetrics = payoutCalculations.reduce((acc, calc) => {
-            // Check if the order has DC->hex or hex->hex incentives (excluding return journey)
-            const hasRegularIncentives = calc.dcToHexIncentive > 0 || (calc.hexToHexIncentive - calc.returnJourneyShare) > 0;
-            
-            // Update totals
             acc.totalOrders += calc.totalShipments;
-            
-            if (hasRegularIncentives) {
-                // Only include orders with regular incentives
+            if (calc.totalIncentive > 0) {
                 acc.incentivizedOrders += calc.totalShipments;
-                // Include all incentives for these orders (including return journey)
                 acc.totalIncentivesPreRto += calc.totalIncentive;
                 acc.totalIncentivesPostRto += calc.totalIncentive / (1 - (calc.clusterRtoPercentage / 100));
             }
-            
             return acc;
         }, {
             totalOrders: 0,
@@ -1472,13 +1947,27 @@ const PayoutComparison: React.FC<PayoutComparisonProps> = ({
             totalIncentivesPostRto: 0
         });
 
-        // Calculate metrics for direct distance system
         const directMetrics = directPayoutCalculations.reduce((acc, calc) => {
             acc.totalOrders += calc.totalShipments;
             if (calc.distanceIncentive > 0) {
                 acc.incentivizedOrders += calc.totalShipments;
                 acc.totalIncentivesPreRto += calc.distanceIncentive;
                 acc.totalIncentivesPostRto += calc.distanceIncentive / (1 - (calc.rtoPercentage / 100));
+            }
+            return acc;
+        }, {
+            totalOrders: 0,
+            incentivizedOrders: 0,
+            totalIncentivesPreRto: 0,
+            totalIncentivesPostRto: 0
+        });
+
+        const flatMetrics = flatPayoutCalculations.reduce((acc, calc) => {
+            acc.totalOrders += calc.totalShipments;
+            if (calc.totalEarnings > 0) {
+                acc.incentivizedOrders += calc.totalShipments;
+                acc.totalIncentivesPreRto += calc.totalEarnings;
+                acc.totalIncentivesPostRto += calc.totalEarnings / (1 - (calc.rtoPercentage / 100));
             }
             return acc;
         }, {
@@ -1502,103 +1991,17 @@ const PayoutComparison: React.FC<PayoutComparisonProps> = ({
                 directMetrics.totalIncentivesPreRto / directMetrics.incentivizedOrders : 0,
             avgIncentivePerOrderPostRto: directMetrics.incentivizedOrders > 0 ? 
                 directMetrics.totalIncentivesPostRto / directMetrics.incentivizedOrders : 0
+        }, {
+            name: 'Flat Distance',
+            percentageIncentivized: (flatMetrics.incentivizedOrders / flatMetrics.totalOrders) * 100,
+            avgIncentivePerOrderPreRto: flatMetrics.incentivizedOrders > 0 ? 
+                flatMetrics.totalIncentivesPreRto / flatMetrics.incentivizedOrders : 0,
+            avgIncentivePerOrderPostRto: flatMetrics.incentivizedOrders > 0 ? 
+                flatMetrics.totalIncentivesPostRto / flatMetrics.incentivizedOrders : 0
         }];
 
         return { dcComparison: dcData, feComparison: feData, incentiveMetrics };
-    }, [clusterPayouts, directPayouts, payoutCalculations, directPayoutCalculations]);
-
-    const hexagonComparison = React.useMemo(() => {
-        const hexData = routeData.flatMap(route => 
-            route.activities
-                .filter(activity => activity.type === 'delivery' && activity.hexagon_index)
-                .map(activity => {
-                    const hexId = String(activity.hexagon_index);
-                    const clusterCalc = payoutCalculations.find(
-                        calc => calc.hexagonId === hexId && 
-                               calc.dcCode === route.dc_code && 
-                               calc.feNumber === route.fe_number
-                    );
-                    const directCalc = directPayoutCalculations.find(
-                        calc => calc.hexagonId === hexId && 
-                               calc.dcCode === route.dc_code && 
-                               calc.feNumber === route.fe_number
-                    );
-
-                    if (!clusterCalc || !directCalc) return null;
-
-                    return {
-                        hexId,
-                        dcCode: route.dc_code,
-                        feNumber: route.fe_number,
-                        clusterEarningsPerShipmentPreRto: clusterCalc.earningsPerShipmentPreRto,
-                        directEarningsPerShipmentPreRto: directCalc.earningsPerShipmentPreRto,
-                        differencePreRto: clusterCalc.earningsPerShipmentPreRto - directCalc.earningsPerShipmentPreRto,
-                        clusterEarningsPerShipmentPostRto: clusterCalc.earningsPerShipmentPostRto,
-                        directEarningsPerShipmentPostRto: directCalc.earningsPerShipmentPostRto,
-                        differencePostRto: clusterCalc.earningsPerShipmentPostRto - directCalc.earningsPerShipmentPostRto,
-                        totalShipments: clusterCalc.totalShipments,
-                        clusterId: clusterCalc.clusterId,
-                        isFirstHexInCluster: clusterCalc.isFirstHexInCluster,
-                        clusterRtoPercentage: clusterCalc.clusterRtoPercentage,
-                        directRtoPercentage: directCalc.rtoPercentage
-                    };
-                })
-                .filter((item): item is NonNullable<typeof item> => item !== null)
-        );
-
-        return hexData;
-    }, [routeData, payoutCalculations, directPayoutCalculations]);
-
-    const handleDownloadExcel = () => {
-        // Prepare data for Excel
-        const excelData = hexagonComparison.map(hex => ({
-            'DC': hex.dcCode,
-            'FE': hex.feNumber,
-            'Hexagon ID': hex.hexId,
-            'Cluster': hex.clusterId + (hex.isFirstHexInCluster ? ' (First)' : ''),
-            'Total Shipments': hex.totalShipments,
-            'Cluster RTO %': Number(hex.clusterRtoPercentage.toFixed(2)),
-            'Direct Distance RTO %': Number(hex.directRtoPercentage.toFixed(2)),
-            'Pre-RTO Metrics': {
-                'Cluster-based Earnings/Shipment (₹)': Number(hex.clusterEarningsPerShipmentPreRto.toFixed(2)),
-                'Direct Distance Earnings/Shipment (₹)': Number(hex.directEarningsPerShipmentPreRto.toFixed(2)),
-                'Difference (₹)': Number(hex.differencePreRto.toFixed(2))
-            },
-            'Post-RTO Metrics': {
-                'Cluster-based Earnings/Shipment (₹)': Number(hex.clusterEarningsPerShipmentPostRto.toFixed(2)),
-                'Direct Distance Earnings/Shipment (₹)': Number(hex.directEarningsPerShipmentPostRto.toFixed(2)),
-                'Difference (₹)': Number(hex.differencePostRto.toFixed(2))
-            }
-        }));
-
-        // Create workbook and worksheet
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.json_to_sheet(excelData);
-
-        // Set column widths
-        const colWidths = [
-            { wch: 10 }, // DC
-            { wch: 10 }, // FE
-            { wch: 15 }, // Hexagon ID
-            { wch: 15 }, // Cluster
-            { wch: 15 }, // Total Shipments
-            { wch: 15 }, // Cluster RTO %
-            { wch: 15 }, // Direct Distance RTO %
-            { wch: 30 }, // Pre-RTO Cluster-based Earnings
-            { wch: 30 }, // Pre-RTO Direct Distance Earnings
-            { wch: 15 }, // Pre-RTO Difference
-            { wch: 30 }, // Post-RTO Cluster-based Earnings
-            { wch: 30 }, // Post-RTO Direct Distance Earnings
-            { wch: 15 }, // Post-RTO Difference
-        ];
-        ws['!cols'] = colWidths;
-
-        // Add the worksheet to the workbook
-        XLSX.utils.book_append_sheet(wb, ws, 'Hexagon Comparison');
-
-        // Generate Excel file and trigger download
-        XLSX.writeFile(wb, 'hexagon-level-earnings-comparison.xlsx');
-    };
+    }, [clusterPayouts, directPayouts, flatPayouts, payoutCalculations, directPayoutCalculations, flatPayoutCalculations]);
 
     return (
         <Box>
@@ -1657,6 +2060,7 @@ const PayoutComparison: React.FC<PayoutComparisonProps> = ({
                                     <Legend />
                                     <Bar dataKey="clusterIncentivesPreRto" name="Cluster-based Incentives" fill="#8884d8" />
                                     <Bar dataKey="directIncentivesPreRto" name="Direct Distance Incentives" fill="#82ca9d" />
+                                    <Bar dataKey="flatIncentivesPreRto" name="Flat Distance Incentives" fill="#ffc658" />
                                 </BarChart>
                             </ResponsiveContainer>
                         </Box>
@@ -1671,6 +2075,7 @@ const PayoutComparison: React.FC<PayoutComparisonProps> = ({
                                     <Legend />
                                     <Bar dataKey="clusterIncentivesPostRto" name="Cluster-based Incentives" fill="#8884d8" />
                                     <Bar dataKey="directIncentivesPostRto" name="Direct Distance Incentives" fill="#82ca9d" />
+                                    <Bar dataKey="flatIncentivesPostRto" name="Flat Distance Incentives" fill="#ffc658" />
                                 </BarChart>
                             </ResponsiveContainer>
                         </Box>
@@ -1691,6 +2096,7 @@ const PayoutComparison: React.FC<PayoutComparisonProps> = ({
                                     <Legend />
                                     <Bar dataKey="clusterTotalEarningsPreRto" name="Cluster-based Total Earnings" fill="#8884d8" />
                                     <Bar dataKey="directTotalEarningsPreRto" name="Direct Distance Total Earnings" fill="#82ca9d" />
+                                    <Bar dataKey="flatTotalEarningsPreRto" name="Flat Distance Total Earnings" fill="#ffc658" />
                                 </BarChart>
                             </ResponsiveContainer>
                         </Box>
@@ -1705,6 +2111,7 @@ const PayoutComparison: React.FC<PayoutComparisonProps> = ({
                                     <Legend />
                                     <Bar dataKey="clusterTotalEarningsPostRto" name="Cluster-based Total Earnings" fill="#8884d8" />
                                     <Bar dataKey="directTotalEarningsPostRto" name="Direct Distance Total Earnings" fill="#82ca9d" />
+                                    <Bar dataKey="flatTotalEarningsPostRto" name="Flat Distance Total Earnings" fill="#ffc658" />
                                 </BarChart>
                             </ResponsiveContainer>
                         </Box>
@@ -1725,6 +2132,7 @@ const PayoutComparison: React.FC<PayoutComparisonProps> = ({
                                     <Legend />
                                     <Bar dataKey="clusterAvgEarningsPreRto" name="Cluster-based Avg Earnings" fill="#8884d8" />
                                     <Bar dataKey="directAvgEarningsPreRto" name="Direct Distance Avg Earnings" fill="#82ca9d" />
+                                    <Bar dataKey="flatAvgEarningsPreRto" name="Flat Distance Avg Earnings" fill="#ffc658" />
                                 </BarChart>
                             </ResponsiveContainer>
                         </Box>
@@ -1739,171 +2147,13 @@ const PayoutComparison: React.FC<PayoutComparisonProps> = ({
                                     <Legend />
                                     <Bar dataKey="clusterAvgEarningsPostRto" name="Cluster-based Avg Earnings" fill="#8884d8" />
                                     <Bar dataKey="directAvgEarningsPostRto" name="Direct Distance Avg Earnings" fill="#82ca9d" />
+                                    <Bar dataKey="flatAvgEarningsPostRto" name="Flat Distance Avg Earnings" fill="#ffc658" />
                                 </BarChart>
                             </ResponsiveContainer>
                         </Box>
                     </Paper>
                 </Grid>
             </Grid>
-
-            <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>FE Level Comparison</Typography>
-            <Grid container spacing={3}>
-                <Grid item xs={12}>
-                    <Paper sx={{ p: 2, mb: 2 }}>
-                        <Box sx={{ mb: 3 }}>
-                            <Typography variant="h6" color="primary" gutterBottom>Pre-RTO Incentives by FE</Typography>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <BarChart data={feComparison}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="feNumber" />
-                                    <YAxis tickFormatter={(value) => `₹${value.toFixed(2)}`} />
-                                    <Tooltip formatter={formatTooltipValue} />
-                                    <Legend />
-                                    <Bar dataKey="clusterIncentivesPreRto" name="Cluster-based Incentives" fill="#8884d8" />
-                                    <Bar dataKey="directIncentivesPreRto" name="Direct Distance Incentives" fill="#82ca9d" />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </Box>
-                        <Box>
-                            <Typography variant="h6" color="error" gutterBottom>Post-RTO Incentives by FE</Typography>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <BarChart data={feComparison}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="feNumber" />
-                                    <YAxis tickFormatter={(value) => `₹${value.toFixed(2)}`} />
-                                    <Tooltip formatter={formatTooltipValue} />
-                                    <Legend />
-                                    <Bar dataKey="clusterIncentivesPostRto" name="Cluster-based Incentives" fill="#8884d8" />
-                                    <Bar dataKey="directIncentivesPostRto" name="Direct Distance Incentives" fill="#82ca9d" />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </Box>
-                    </Paper>
-                </Grid>
-
-                <Grid item xs={12}>
-                    <Paper sx={{ p: 2, mb: 2 }}>
-                        <Box sx={{ mb: 3 }}>
-                            <Typography variant="h6" color="primary" gutterBottom>Pre-RTO Total Earnings by FE</Typography>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <BarChart data={feComparison}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="feNumber" />
-                                    <YAxis tickFormatter={(value) => `₹${value.toFixed(2)}`} />
-                                    <Tooltip formatter={formatTooltipValue} />
-                                    <Legend />
-                                    <Bar dataKey="clusterTotalEarningsPreRto" name="Cluster-based Total Earnings" fill="#8884d8" />
-                                    <Bar dataKey="directTotalEarningsPreRto" name="Direct Distance Total Earnings" fill="#82ca9d" />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </Box>
-                        <Box>
-                            <Typography variant="h6" color="error" gutterBottom>Post-RTO Total Earnings by FE</Typography>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <BarChart data={feComparison}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="feNumber" />
-                                    <YAxis tickFormatter={(value) => `₹${value.toFixed(2)}`} />
-                                    <Tooltip formatter={formatTooltipValue} />
-                                    <Legend />
-                                    <Bar dataKey="clusterTotalEarningsPostRto" name="Cluster-based Total Earnings" fill="#8884d8" />
-                                    <Bar dataKey="directTotalEarningsPostRto" name="Direct Distance Total Earnings" fill="#82ca9d" />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </Box>
-                    </Paper>
-                </Grid>
-            </Grid>
-
-            <Box sx={{ mt: 4 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6" gutterBottom>Hexagon-Level Comparison</Typography>
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        startIcon={<DownloadIcon />}
-                        onClick={handleDownloadExcel}
-                    >
-                        Download Excel
-                    </Button>
-                </Box>
-                <TableContainer component={Paper} sx={{ p: 2, mb: 2 }}>
-                    <Table>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>DC</TableCell>
-                                <TableCell>FE</TableCell>
-                                <TableCell>Hexagon ID</TableCell>
-                                <TableCell>Cluster</TableCell>
-                                <TableCell>Shipments</TableCell>
-                                <TableCell>RTO %</TableCell>
-                                <TableCell>Pre-RTO Earnings/Shipment</TableCell>
-                                <TableCell>Pre-RTO Difference</TableCell>
-                                <TableCell>Post-RTO Earnings/Shipment</TableCell>
-                                <TableCell>Post-RTO Difference</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {hexagonComparison.map((hex, idx) => (
-                                <TableRow 
-                                    key={`${hex.dcCode}-${hex.feNumber}-${hex.hexId}-${idx}`}
-                                    sx={{
-                                        backgroundColor: hex.isFirstHexInCluster ? 
-                                            hex.clusterId === '1' ?
-                                                'rgba(144, 238, 144, 0.2)' :  // light green for first hex of cluster 1
-                                                'rgba(255, 255, 0, 0.1)' :    // light yellow for first hex of other clusters
-                                            'inherit'
-                                    }}
-                                >
-                                    <TableCell>{hex.dcCode}</TableCell>
-                                    <TableCell>{hex.feNumber}</TableCell>
-                                    <TableCell>{hex.hexId}</TableCell>
-                                    <TableCell>
-                                        {hex.clusterId}
-                                        {hex.isFirstHexInCluster && (
-                                            <Typography component="span" color="primary">
-                                                {' '}(First)
-                                            </Typography>
-                                        )}
-                                    </TableCell>
-                                    <TableCell>{hex.totalShipments}</TableCell>
-                                    <TableCell>
-                                        C: {hex.clusterRtoPercentage.toFixed(1)}%
-                                        <br />
-                                        D: {hex.directRtoPercentage.toFixed(1)}%
-                                    </TableCell>
-                                    <TableCell>
-                                        <Box>
-                                            <Typography>Cluster: ₹{hex.clusterEarningsPerShipmentPreRto.toFixed(2)}</Typography>
-                                            <Typography>Direct: ₹{hex.directEarningsPerShipmentPreRto.toFixed(2)}</Typography>
-                                        </Box>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Typography
-                                            color={hex.differencePreRto > 0 ? 'success.main' : hex.differencePreRto < 0 ? 'error.main' : 'inherit'}
-                                        >
-                                            {hex.differencePreRto > 0 ? '+' : ''}{hex.differencePreRto.toFixed(2)}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Box>
-                                            <Typography>Cluster: ₹{hex.clusterEarningsPerShipmentPostRto.toFixed(2)}</Typography>
-                                            <Typography>Direct: ₹{hex.directEarningsPerShipmentPostRto.toFixed(2)}</Typography>
-                                        </Box>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Typography
-                                            color={hex.differencePostRto > 0 ? 'success.main' : hex.differencePostRto < 0 ? 'error.main' : 'inherit'}
-                                        >
-                                            {hex.differencePostRto > 0 ? '+' : ''}{hex.differencePostRto.toFixed(2)}
-                                        </Typography>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            </Box>
         </Box>
     );
 };

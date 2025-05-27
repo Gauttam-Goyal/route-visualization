@@ -51,6 +51,8 @@ export interface DistanceMetrics {
     cityAverage?: number;
     dcAverage?: number;
     feAverage?: number;
+    dcToHexAverage?: number;
+    hexToHexAverage?: number;
 }
 
 export interface Activity {
@@ -110,4 +112,38 @@ export interface PayoutCalculation {
     connectedHexId: string | null;
     isFirstHexInCluster: boolean;
     incomingHexId: string | null;
+}
+
+export interface DirectDistancePayout {
+    hexagonId: string;
+    dcCode: string;
+    feNumber: string;
+    date: string;
+    totalShipments: number;
+    directDistance: number;
+    excessDistance: number;
+    distanceIncentive: number;
+    baseEarnings: number;
+    totalEarnings: number;
+    earningsPerShipment: number;
+    earningsPerShipmentPreRto: number;
+    earningsPerShipmentPostRto: number;
+    rtoPercentage: number;
+}
+
+export interface FlatDistancePayout {
+    hexagonId: string;
+    dcCode: string;
+    feNumber: string;
+    date: string;
+    totalShipments: number;
+    directDistance: number;
+    excessDistance: number;
+    flatIncentive: number;
+    baseEarnings: number;
+    totalEarnings: number;
+    earningsPerShipment: number;
+    earningsPerShipmentPreRto: number;
+    earningsPerShipmentPostRto: number;
+    rtoPercentage: number;
 } 
