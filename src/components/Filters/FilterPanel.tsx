@@ -14,40 +14,85 @@ import {
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { Filters } from '../../types';
-
-interface FilterOptions {
-    cities: string[];
-    dcCodes: string[];
-    feNumbers: string[];
-    dates: string[];
-}
+import { Filters, RouteData } from '../../types';
 
 interface FilterPanelProps {
-    filterOptions: FilterOptions;
     filters: Filters;
     setFilters: (filters: Filters) => void;
+    availableRoutes: RouteData[];
+    cities: string[];
 }
 
-const FilterPanel: React.FC<FilterPanelProps> = ({ filterOptions, filters, setFilters }) => {
-    const handleCityChange = (event: SelectChangeEvent<string[]>) => {
-        const city = event.target.value as string[];
+const FilterPanel: React.FC<FilterPanelProps> = ({ filters, setFilters, availableRoutes, cities }) => {
+    // Extract unique values for filters
+    const filterOptions = React.useMemo(() => {
+        // Get DC codes for the selected city
+        const filteredRoutes = filters.city.length > 0
+            ? availableRoutes.filter(route => route.city.toLowerCase() === filters.city[0].toLowerCase())
+            : [];
+
+        const dcCodes = [...new Set(filteredRoutes.map(route => route.dc_code))].sort();
+
+        // Get FE numbers based on selected DCs
+        const feFilteredRoutes = filters.dcCode.includes('ALL')
+            ? filteredRoutes // If "ALL" is selected, use all routes for the city
+            : filters.dcCode.length > 0
+                ? filteredRoutes.filter(route => filters.dcCode.includes(route.dc_code))
+                : filteredRoutes;
+
+        const feNumbers = [...new Set(feFilteredRoutes.map(route => route.fe_number))].sort();
+
+        // Get dates based on selected city, DC, and FE
+        const dateFilteredRoutes = filters.feNumber.length > 0
+            ? feFilteredRoutes.filter(route => filters.feNumber.includes(route.fe_number))
+            : feFilteredRoutes;
+
+        const dates = [...new Set(dateFilteredRoutes.map(route => route.date))].sort();
+
+        return { dcCodes, feNumbers, dates };
+    }, [availableRoutes, filters.city, filters.dcCode, filters.feNumber]);
+
+    const handleCityChange = (event: SelectChangeEvent<string>) => {
+        const selectedCity = event.target.value;
+        
         setFilters({
             ...filters,
-            city,
-            // Reset DC and FE when city changes
-            dcCode: [],
-            feNumber: []
+            city: [selectedCity], // Wrap in array to maintain type consistency
+            dcCode: [], // Reset DC selection instead of auto-selecting
+            feNumber: [] // Reset FE selection
         });
     };
 
     const handleDcCodeChange = (event: SelectChangeEvent<string[]>) => {
-        const dcCode = event.target.value as string[];
+        const selectedValues = event.target.value as string[];
+
+        // If "ALL" is in the current selection but not in the new selection,
+        // or if "ALL" is being clicked while already selected, clear all selections
+        if ((filters.dcCode.includes('ALL') && !selectedValues.includes('ALL')) ||
+            (filters.dcCode.includes('ALL') && selectedValues.includes('ALL'))) {
+            setFilters({
+                ...filters,
+                dcCode: [],
+                feNumber: [] // Reset FE when DC changes
+            });
+            return;
+        }
+
+        // If "ALL" is being selected, select all DCs
+        if (selectedValues.includes('ALL')) {
+            setFilters({
+                ...filters,
+                dcCode: ['ALL', ...filterOptions.dcCodes],
+                feNumber: [] // Reset FE when DC changes
+            });
+            return;
+        }
+
+        // Normal selection of individual DCs
         setFilters({
             ...filters,
-            dcCode,
-            // Reset FE when DC changes
-            feNumber: []
+            dcCode: selectedValues,
+            feNumber: [] // Reset FE when DC changes
         });
     };
 
@@ -80,16 +125,13 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filterOptions, filters, setFi
             <FormControl fullWidth margin="normal" size="small">
                 <InputLabel>City</InputLabel>
                 <Select
-                    multiple
-                    value={filters.city}
+                    value={filters.city[0] || ''} // Get first (and only) city or empty string
                     label="City"
                     onChange={handleCityChange}
-                    renderValue={(selected) => (selected as string[]).join(', ')}
                 >
-                    {filterOptions.cities.map(city => (
+                    {cities.map(city => (
                         <MenuItem key={city} value={city}>
-                            <Checkbox checked={filters.city.indexOf(city) > -1} />
-                            <ListItemText primary={city} />
+                            {city}
                         </MenuItem>
                     ))}
                 </Select>
@@ -102,12 +144,20 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filterOptions, filters, setFi
                     value={filters.dcCode}
                     label="DC Code"
                     onChange={handleDcCodeChange}
-                    renderValue={(selected) => (selected as string[]).join(', ')}
+                    renderValue={(selected) => {
+                        const selectedValues = selected as string[];
+                        if (selectedValues.includes('ALL')) return 'All DCs';
+                        return selectedValues.join(', ');
+                    }}
                     disabled={filterOptions.dcCodes.length === 0}
                 >
+                    <MenuItem value="ALL">
+                        <Checkbox checked={filters.dcCode.includes('ALL')} />
+                        <ListItemText primary="Select All" />
+                    </MenuItem>
                     {filterOptions.dcCodes.map(dc => (
                         <MenuItem key={dc} value={dc}>
-                            <Checkbox checked={filters.dcCode.indexOf(dc) > -1} />
+                            <Checkbox checked={filters.dcCode.includes(dc)} />
                             <ListItemText primary={dc} />
                         </MenuItem>
                     ))}
@@ -131,7 +181,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ filterOptions, filters, setFi
                 >
                     {filterOptions.feNumbers.map(fe => (
                         <MenuItem key={fe} value={fe}>
-                            <Checkbox checked={filters.feNumber.indexOf(fe) > -1} />
+                            <Checkbox checked={filters.feNumber.includes(fe)} />
                             <ListItemText 
                                 primary={fe}
                                 primaryTypographyProps={{

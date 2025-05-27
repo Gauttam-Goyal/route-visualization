@@ -16,6 +16,9 @@
     "@types/node": "^16.18.80",
     "@types/react": "^18.2.55",
     "@types/react-dom": "^18.2.19",
+    "@types/xlsx": "^0.0.35",
+    "ajv": "^8.12.0",
+    "ajv-keywords": "^5.1.0",
     "date-fns": "^2.30.0",
     "leaflet": "^1.9.4",
     "react": "^18.2.0",
@@ -24,10 +27,11 @@
     "react-scripts": "5.0.1",
     "recharts": "^2.12.0",
     "typescript": "^4.9.5",
-    "web-vitals": "^2.1.4"
+    "web-vitals": "^2.1.4",
+    "xlsx": "^0.18.5"
   },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "PORT=3001 react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
@@ -36,7 +40,10 @@
     "extends": [
       "react-app",
       "react-app/jest"
-    ]
+    ],
+    "rules": {
+      "no-useless-escape": "off"
+    }
   },
   "browserslist": {
     "production": [

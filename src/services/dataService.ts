@@ -12,23 +12,27 @@ export async function fetchRouteData(): Promise<RouteData[]> {
 
 export async function fetchLocationData(): Promise<LocationData> {
     try {
-        const [dcResponse, hexagonResponse] = await Promise.all([
+        const [dcResponse, hexagonResponse, mappingResponse] = await Promise.all([
             fetch('/data/dc-locations.json'),
-            fetch('/data/hexagon-centroids.json')
+            fetch('/data/hexagon-centroids.json'),
+            fetch('/data/hexagon-customer-mapping.json')
         ]);
 
         const dcLocations = await dcResponse.json();
         const hexagonCentroids = await hexagonResponse.json();
+        const hexagonCustomerMapping = await mappingResponse.json();
 
         return {
             dcLocations,
-            hexagonCentroids
+            hexagonCentroids,
+            hexagonCustomerMapping
         };
     } catch (error) {
         console.error('Error fetching location data:', error);
         return {
             dcLocations: [],
-            hexagonCentroids: []
+            hexagonCentroids: [],
+            hexagonCustomerMapping: []
         };
     }
 }

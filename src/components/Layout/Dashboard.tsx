@@ -1,12 +1,13 @@
 import React from 'react';
-import { Box, Paper, Typography, CircularProgress } from '@mui/material';
+import { Box, Paper, Typography, CircularProgress, Tabs, Tab } from '@mui/material';
 import FilterPanel from '../Filters/FilterPanel';
 import HexagonMap from '../Map/HexagonMap';
 import DistanceMetrics from '../Analytics/DistanceMetrics';
 import DistanceChart from '../Analytics/DistanceChart';
-import { RouteData, LocationData, Filters } from '../../types';
+import PayoutsView from '../Analytics/PayoutsView';
+import { RouteData, LocationData, Filters, PayoutSummary, PayoutCalculation } from '../../types';
 import { calculateAverages } from '../../utils/calculations';
-import { MAX_ROUTE_DISTANCE, getCityBoundary } from '../../utils/constants';
+import { MAX_ROUTE_DISTANCE, getCityBoundary, AVAILABLE_CITIES } from '../../utils/constants';
 
 interface DashboardProps {
     routeData: RouteData[];
@@ -16,6 +17,32 @@ interface DashboardProps {
     setFilters: (filters: Filters) => void;
 }
 
+interface TabPanelProps {
+    children?: React.ReactNode;
+    index: number;
+    value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+    const { children, value, index, ...other } = props;
+
+    return (
+        <div
+            role="tabpanel"
+            hidden={value !== index}
+            id={`simple-tabpanel-${index}`}
+            aria-labelledby={`simple-tab-${index}`}
+            {...other}
+        >
+            {value === index && (
+                <Box>
+                    {children}
+                </Box>
+            )}
+        </div>
+    );
+}
+
 const Dashboard: React.FC<DashboardProps> = ({
     routeData,
     locationData,
@@ -23,22 +50,27 @@ const Dashboard: React.FC<DashboardProps> = ({
     filters,
     setFilters
 }) => {
+    const [activeTab, setActiveTab] = React.useState(0);
+    const [payoutCalculations, setPayoutCalculations] = React.useState<PayoutCalculation[]>([]);
+
     // Extract unique values for filters
     const filterOptions = React.useMemo(() => {
         // Get all cities
-        const cities = [...new Set(routeData.map(route => route.city))].sort();
+        const cities = AVAILABLE_CITIES.map(city => city.toLowerCase());
 
-        // Get DC codes and FE numbers based on selected city
+        // Get DC codes for the selected city
         const filteredRoutes = filters.city.length > 0
-            ? routeData.filter(route => filters.city.includes(route.city))
-            : routeData;
+            ? routeData.filter(route => route.city === filters.city[0])
+            : [];
 
         const dcCodes = [...new Set(filteredRoutes.map(route => route.dc_code))].sort();
 
-        // Get FE numbers based on selected city and DC
-        const feFilteredRoutes = filters.dcCode.length > 0
-            ? filteredRoutes.filter(route => filters.dcCode.includes(route.dc_code))
-            : filteredRoutes;
+        // Get FE numbers based on selected DCs
+        const feFilteredRoutes = filters.dcCode.includes('ALL')
+            ? filteredRoutes // If "ALL" is selected, use all routes for the city
+            : filters.dcCode.length > 0
+                ? filteredRoutes.filter(route => filters.dcCode.includes(route.dc_code))
+                : filteredRoutes;
 
         const feNumbers = [...new Set(feFilteredRoutes.map(route => route.fe_number))].sort();
 
@@ -53,6 +85,16 @@ const Dashboard: React.FC<DashboardProps> = ({
     }, [routeData, filters.city, filters.dcCode, filters.feNumber]);
 
     const filteredData = React.useMemo(() => {
+        // If no city is selected, return empty array
+        if (filters.city.length === 0) {
+            return [];
+        }
+
+        // Only show routes when at least one DC is selected
+        if (filters.dcCode.length === 0) {
+            return [];
+        }
+
         return routeData.filter(route => {
             // Check if route distance is within limit
             const routeDistance = parseFloat(route.total_distance);
@@ -63,25 +105,28 @@ const Dashboard: React.FC<DashboardProps> = ({
             // Check if all hexagon coordinates are within city boundaries
             const cityBoundary = getCityBoundary(route.city);
             if (!cityBoundary) {
-                return false;
+                console.warn(`No boundary found for city: ${route.city}`);
+                return true; // Allow routes even if boundary not found
             }
 
-            // Check if all activities in the route are within city boundaries
-            const allActivitiesInBounds = route.activities.every(activity => {
+            // More lenient boundary check - only check if any activity is within bounds
+            const anyActivityInBounds = route.activities.some(activity => {
                 return activity.lat >= cityBoundary.south &&
                     activity.lat <= cityBoundary.north &&
                     activity.lng >= cityBoundary.west &&
                     activity.lng <= cityBoundary.east;
             });
 
-            if (!allActivitiesInBounds) {
+            if (!anyActivityInBounds) {
                 return false;
             }
 
-            // Apply user filters
+            // Apply user filters with case-insensitive city comparison
+            const isDcSelected = filters.dcCode.includes('ALL') || filters.dcCode.includes(route.dc_code);
+            
             return (
-                (filters.city.length === 0 || filters.city.includes(route.city)) &&
-                (filters.dcCode.length === 0 || filters.dcCode.includes(route.dc_code)) &&
+                route.city.toLowerCase() === filters.city[0].toLowerCase() && // Case-insensitive city match
+                isDcSelected && // Must match selected DC or "ALL"
                 (filters.feNumber.length === 0 || filters.feNumber.includes(route.fe_number)) &&
                 (filters.date.length === 0 || filters.date.includes(route.date))
             );
@@ -92,31 +137,38 @@ const Dashboard: React.FC<DashboardProps> = ({
         return calculateAverages(filteredData);
     }, [filteredData]);
 
+    const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+        setActiveTab(newValue);
+    };
+
     if (loading) {
         return (
-            <Box display="flex" justifyContent="center" alignItems="center" height="80vh">
+            <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
                 <CircularProgress />
             </Box>
         );
     }
 
     return (
-        <Box p={3}>
-            <Box display="flex" gap={3}>
-                <Box flex="0 0 25%">
-                    <Paper>
-                        <Box p={2}>
-                            <Typography variant="h6" gutterBottom>Filters</Typography>
+        <Box display="flex" height="100vh">
+            <Box width="300px" p={2} borderRight={1} borderColor="divider">
                             <FilterPanel
-                                filterOptions={filterOptions}
                                 filters={filters}
                                 setFilters={setFilters}
+                    availableRoutes={routeData}
+                    cities={AVAILABLE_CITIES}
                             />
-                        </Box>
-                    </Paper>
                 </Box>
 
                 <Box flex="1">
+                <Paper sx={{ mb: 2 }}>
+                    <Tabs value={activeTab} onChange={handleTabChange} aria-label="dashboard tabs">
+                        <Tab label="Route Analysis" />
+                        <Tab label="Payouts" />
+                    </Tabs>
+                </Paper>
+
+                <TabPanel value={activeTab} index={0}>
                     <Box display="flex" flexDirection="column" gap={3}>
                         <Paper>
                             <Box p={2}>
@@ -131,6 +183,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 <HexagonMap
                                     locationData={locationData}
                                     filteredRoutes={filteredData}
+                                    payoutCalculations={payoutCalculations}
                                 />
                             </Box>
                         </Paper>
@@ -142,7 +195,19 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </Box>
                         </Paper>
                     </Box>
-                </Box>
+                </TabPanel>
+
+                <TabPanel value={activeTab} index={1}>
+                    <PayoutsView
+                        routeData={filteredData}
+                        locationData={locationData}
+                        onPayoutCalculated={(payouts: PayoutSummary[], calculations?: PayoutCalculation[]) => {
+                            if (calculations) {
+                                setPayoutCalculations(calculations);
+                            }
+                        }}
+                    />
+                </TabPanel>
             </Box>
         </Box>
     );

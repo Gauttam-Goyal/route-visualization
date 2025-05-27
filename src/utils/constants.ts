@@ -1,5 +1,7 @@
 export type CityName = 'VISAKHAPATNAM' | 'VELLORE' | 'GHAZIABAD';
 
+export const AVAILABLE_CITIES: CityName[] = ['VISAKHAPATNAM', 'VELLORE', 'GHAZIABAD'];
+
 export interface CityBoundary {
     north: number;
     south: number;

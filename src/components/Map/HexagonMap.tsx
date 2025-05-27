@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, CircleMarker, Polyline, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
+import * as L from 'leaflet';
 import { Box, Typography, Button, ButtonGroup } from '@mui/material';
 import { LocationData, RouteData, PayoutCalculation } from '../../types';
 import { getHexagonCentroidsForRoutes } from '../../services/mapService';
@@ -110,7 +110,17 @@ const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes, p
                                 <div>
                                     <strong>Route:</strong> {route.fe_number}<br />
                                     <strong>DC Code:</strong> {route.dc_code}<br />
-                                    <strong>Direct Distance:</strong> {activity.distance_from_dc?.toFixed(2)}m
+                                    <strong>Direct Distance:</strong> {activity.distance_from_dc?.toFixed(2)}m<br />
+                                    <strong>Distance Range:</strong> {
+                                        distance <= 1000 ? '< 1km' :
+                                        distance <= 2000 ? '1-2km' :
+                                        distance <= 3000 ? '2-3km' :
+                                        distance <= 4000 ? '3-4km' :
+                                        distance <= 5000 ? '4-5km' :
+                                        distance <= 6000 ? '5-6km' :
+                                        distance <= 7000 ? '6-7km' :
+                                        '> 7km'
+                                    }
                                 </div>
                             </Tooltip>
                         </Polyline>
