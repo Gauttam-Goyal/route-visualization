@@ -1,0 +1,41 @@
+redirectsOrigin = "config"
+plugins = []
+headers = []
+
+[functions]
+
+[functions."*"]
+
+[build]
+publish = "/Users/gauttamgoyal/Documents/route-visualization/build"
+publishOrigin = "config"
+commandOrigin = "config"
+command = "DISABLE_ESLINT_PLUGIN=true CI=false npm run build"
+
+[build.environment]
+DISABLE_ESLINT_PLUGIN = "true"
+CI = "false"
+
+[build.processing]
+
+[build.processing.css]
+
+[build.processing.html]
+
+[build.processing.images]
+
+[build.processing.js]
+
+[build.services]
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200.0
+force = false
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]
