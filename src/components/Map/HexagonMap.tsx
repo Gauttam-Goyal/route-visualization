@@ -24,6 +24,7 @@ interface HexagonMapProps {
     filteredRoutes: RouteData[];
     payoutCalculations: PayoutCalculation[] | DirectDistancePayout[] | FlatDistancePayout[];
     viewMode: 'route' | 'direct' | 'flat';
+    onViewModeChange: (mode: 'route' | 'direct' | 'flat') => void;
 }
 
 interface Centroid {
@@ -34,10 +35,16 @@ interface Centroid {
     all_cluster_ids?: string[];
 }
 
-const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes, payoutCalculations, viewMode }) => {
+const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes, payoutCalculations, viewMode, onViewModeChange }) => {
     const [visibleCentroids, setVisibleCentroids] = useState<Centroid[]>([]);
     const [mapCenter, setMapCenter] = useState<[number, number]>([23.0, 80.0]); // Default: Central India
     const [zoom, setZoom] = useState(5); // Default zoom level to show both cities
+    const [currentViewMode, setCurrentViewMode] = useState<HexagonMapProps['viewMode']>(viewMode);
+
+    // Update parent component when view mode changes
+    useEffect(() => {
+        onViewModeChange(currentViewMode);
+    }, [currentViewMode, onViewModeChange]);
 
     useEffect(() => {
         // Get hexagon centroids that match the filtered routes
@@ -64,7 +71,7 @@ const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes, p
             const dc = locationData.dcLocations.find(dc => dc.dc_code === route.dc_code);
             if (!dc) return [];
 
-            if (viewMode === 'direct' || viewMode === 'flat') {
+            if (currentViewMode === 'direct' || currentViewMode === 'flat') {
                 // For direct and flat views, only show lines from DC to delivery points
                 const deliveryActivities = activities.filter(activity => activity.type === 'delivery');
                 
@@ -104,7 +111,7 @@ const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes, p
                     
                     return (
                         <Polyline
-                            key={`${routeIndex}-${index}-${viewMode}`}
+                            key={`${routeIndex}-${index}-${currentViewMode}`}
                             positions={[
                                 [dc.lat, dc.lng],
                                 [activity.lat, activity.lng]
@@ -122,7 +129,7 @@ const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes, p
                                     <strong>Route:</strong> {route.fe_number}<br />
                                     <strong>DC Code:</strong> {route.dc_code}<br />
                                     <strong>Direct Distance:</strong> {activity.distance_from_dc?.toFixed(2)}m<br />
-                                    {viewMode === 'flat' && (
+                                    {currentViewMode === 'flat' && (
                                         <>
                                             <strong>Flat Distance Payout:</strong> ₹{flatPayout}<br />
                                         </>
@@ -316,20 +323,23 @@ const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes, p
             }}>
                 <ButtonGroup>
                     <Button 
-                        variant={viewMode === 'route' ? 'contained' : 'outlined'}
+                        variant={currentViewMode === 'route' ? 'contained' : 'outlined'}
                         size="small"
+                        onClick={() => setCurrentViewMode('route')}
                     >
                         Route View
                     </Button>
                     <Button 
-                        variant={viewMode === 'direct' ? 'contained' : 'outlined'}
+                        variant={currentViewMode === 'direct' ? 'contained' : 'outlined'}
                         size="small"
+                        onClick={() => setCurrentViewMode('direct')}
                     >
                         Direct View
                     </Button>
                     <Button 
-                        variant={viewMode === 'flat' ? 'contained' : 'outlined'}
+                        variant={currentViewMode === 'flat' ? 'contained' : 'outlined'}
                         size="small"
+                        onClick={() => setCurrentViewMode('flat')}
                     >
                         Flat View
                     </Button>

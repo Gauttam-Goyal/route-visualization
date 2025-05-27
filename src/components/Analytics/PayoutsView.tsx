@@ -334,6 +334,7 @@ const PayoutsView: React.FC<PayoutsViewProps> = ({ routeData, locationData, onPa
                     directPayouts={directPayouts}
                     flatPayouts={flatPayouts}
                     routeData={routeData}
+                    locationData={locationData}
                     payoutCalculations={payoutCalculations}
                     directPayoutCalculations={directPayoutCalculations}
                     flatPayoutCalculations={flatPayoutCalculations}
@@ -1857,6 +1858,7 @@ interface PayoutComparisonProps {
     directPayouts: PayoutSummary[];
     flatPayouts: PayoutSummary[];
     routeData: RouteData[];
+    locationData: LocationData;
     payoutCalculations: PayoutCalculation[];
     directPayoutCalculations: DirectDistancePayout[];
     flatPayoutCalculations: FlatDistancePayout[];
@@ -1867,6 +1869,7 @@ const PayoutComparison: React.FC<PayoutComparisonProps> = ({
     directPayouts, 
     flatPayouts, 
     routeData,
+    locationData,
     payoutCalculations,
     directPayoutCalculations,
     flatPayoutCalculations 
@@ -2046,6 +2049,7 @@ const PayoutComparison: React.FC<PayoutComparisonProps> = ({
                     </Paper>
                 </Grid>
 
+                {/* DC-level Comparison Charts */}
                 <Grid item xs={12}>
                     <Paper sx={{ p: 2, mb: 2 }}>
                         <Typography variant="subtitle1" gutterBottom>Total Incentives by DC</Typography>
@@ -2151,6 +2155,250 @@ const PayoutComparison: React.FC<PayoutComparisonProps> = ({
                                 </BarChart>
                             </ResponsiveContainer>
                         </Box>
+                    </Paper>
+                </Grid>
+
+                {/* FE-level Comparison Charts */}
+                <Grid item xs={12}>
+                    <Paper sx={{ p: 2, mb: 2 }}>
+                        <Typography variant="subtitle1" gutterBottom>Total Incentives by FE</Typography>
+                        <Box sx={{ mb: 3 }}>
+                            <Typography variant="h6" color="primary" gutterBottom>Pre-RTO</Typography>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <BarChart data={feComparison}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="feNumber" />
+                                    <YAxis tickFormatter={(value) => `₹${value.toFixed(2)}`} />
+                                    <Tooltip formatter={formatTooltipValue} />
+                                    <Legend />
+                                    <Bar dataKey="clusterIncentivesPreRto" name="Cluster-based Incentives" fill="#8884d8" />
+                                    <Bar dataKey="directIncentivesPreRto" name="Direct Distance Incentives" fill="#82ca9d" />
+                                    <Bar dataKey="flatIncentivesPreRto" name="Flat Distance Incentives" fill="#ffc658" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </Box>
+                        <Box>
+                            <Typography variant="h6" color="error" gutterBottom>Post-RTO</Typography>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <BarChart data={feComparison}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="feNumber" />
+                                    <YAxis tickFormatter={(value) => `₹${value.toFixed(2)}`} />
+                                    <Tooltip formatter={formatTooltipValue} />
+                                    <Legend />
+                                    <Bar dataKey="clusterIncentivesPostRto" name="Cluster-based Incentives" fill="#8884d8" />
+                                    <Bar dataKey="directIncentivesPostRto" name="Direct Distance Incentives" fill="#82ca9d" />
+                                    <Bar dataKey="flatIncentivesPostRto" name="Flat Distance Incentives" fill="#ffc658" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </Box>
+                    </Paper>
+                </Grid>
+
+                <Grid item xs={12}>
+                    <Paper sx={{ p: 2, mb: 2 }}>
+                        <Typography variant="subtitle1" gutterBottom>Total Earnings by FE</Typography>
+                        <Box sx={{ mb: 3 }}>
+                            <Typography variant="h6" color="primary" gutterBottom>Pre-RTO</Typography>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <BarChart data={feComparison}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="feNumber" />
+                                    <YAxis tickFormatter={(value) => `₹${value.toFixed(2)}`} />
+                                    <Tooltip formatter={formatTooltipValue} />
+                                    <Legend />
+                                    <Bar dataKey="clusterTotalEarningsPreRto" name="Cluster-based Total Earnings" fill="#8884d8" />
+                                    <Bar dataKey="directTotalEarningsPreRto" name="Direct Distance Total Earnings" fill="#82ca9d" />
+                                    <Bar dataKey="flatTotalEarningsPreRto" name="Flat Distance Total Earnings" fill="#ffc658" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </Box>
+                        <Box>
+                            <Typography variant="h6" color="error" gutterBottom>Post-RTO</Typography>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <BarChart data={feComparison}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="feNumber" />
+                                    <YAxis tickFormatter={(value) => `₹${value.toFixed(2)}`} />
+                                    <Tooltip formatter={formatTooltipValue} />
+                                    <Legend />
+                                    <Bar dataKey="clusterTotalEarningsPostRto" name="Cluster-based Total Earnings" fill="#8884d8" />
+                                    <Bar dataKey="directTotalEarningsPostRto" name="Direct Distance Total Earnings" fill="#82ca9d" />
+                                    <Bar dataKey="flatTotalEarningsPostRto" name="Flat Distance Total Earnings" fill="#ffc658" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </Box>
+                    </Paper>
+                </Grid>
+
+                {/* Hexagon-level Comparison Table */}
+                <Grid item xs={12}>
+                    <Paper sx={{ p: 2 }}>
+                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                            <Typography variant="subtitle1">Hexagon-level Comparison</Typography>
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                onClick={() => {
+                                    // Create workbook
+                                    const wb = XLSX.utils.book_new();
+                                    
+                                    // Prepare data for export
+                                    const hexagonData = routeData.flatMap(route => {
+                                        const clusterCalc = payoutCalculations.find(c => 
+                                            c.dcCode === route.dc_code && 
+                                            c.feNumber === route.fe_number && 
+                                            c.date === route.date
+                                        );
+                                        const directCalc = directPayoutCalculations.find(c => 
+                                            c.dcCode === route.dc_code && 
+                                            c.feNumber === route.fe_number && 
+                                            c.date === route.date
+                                        );
+                                        const flatCalc = flatPayoutCalculations.find(c => 
+                                            c.dcCode === route.dc_code && 
+                                            c.feNumber === route.fe_number && 
+                                            c.date === route.date
+                                        );
+
+                                        return route.activities
+                                            .filter(activity => activity.type === 'delivery' && activity.hexagon_index)
+                                            .map(activity => ({
+                                                'Hexagon ID': activity.hexagon_index,
+                                                'DC Code': route.dc_code,
+                                                'FE Number': route.fe_number,
+                                                'Date': route.date,
+                                                'Cluster-based Payout': clusterCalc?.totalEarnings || 0,
+                                                'Direct Distance Payout': directCalc?.totalEarnings || 0,
+                                                'Flat Distance Payout': flatCalc?.totalEarnings || 0,
+                                                'Cluster-based Per Shipment': clusterCalc?.earningsPerShipment || 0,
+                                                'Direct Distance Per Shipment': directCalc?.earningsPerShipment || 0,
+                                                'Flat Distance Per Shipment': flatCalc?.earningsPerShipment || 0,
+                                                'RTO Percentage': activity.rto_percentage || 0
+                                            }));
+                                    });
+
+                                    // Create worksheet
+                                    const ws = XLSX.utils.json_to_sheet(hexagonData);
+                                    
+                                    // Add worksheet to workbook
+                                    XLSX.utils.book_append_sheet(wb, ws, 'Hexagon Comparison');
+                                    
+                                    // Save file
+                                    XLSX.writeFile(wb, 'hexagon_comparison.xlsx');
+                                }}
+                            >
+                                Download Excel
+                            </Button>
+                        </Box>
+                        <TableContainer>
+                            <Table size="small">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell>DC</TableCell>
+                                        <TableCell>FE</TableCell>
+                                        <TableCell>Hexagon ID</TableCell>
+                                        <TableCell>Cluster</TableCell>
+                                        <TableCell>Shipments</TableCell>
+                                        <TableCell>RTO %</TableCell>
+                                        <TableCell>Pre-RTO Earnings/Shipment</TableCell>
+                                        <TableCell>Pre-RTO Difference</TableCell>
+                                        <TableCell>Post-RTO Earnings/Shipment</TableCell>
+                                        <TableCell>Post-RTO Difference</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {routeData.flatMap(route => 
+                                        route.activities
+                                            .filter(activity => activity.type === 'delivery' && activity.hexagon_index)
+                                            .map(activity => {
+                                                const clusterCalc = payoutCalculations.find(c => 
+                                                    c.dcCode === route.dc_code && 
+                                                    c.feNumber === route.fe_number && 
+                                                    c.date === route.date &&
+                                                    c.hexagonId === String(activity.hexagon_index)
+                                                );
+                                                const directCalc = directPayoutCalculations.find(c => 
+                                                    c.dcCode === route.dc_code && 
+                                                    c.feNumber === route.fe_number && 
+                                                    c.date === route.date &&
+                                                    c.hexagonId === String(activity.hexagon_index)
+                                                );
+                                                const flatCalc = flatPayoutCalculations.find(c => 
+                                                    c.dcCode === route.dc_code && 
+                                                    c.feNumber === route.fe_number && 
+                                                    c.date === route.date &&
+                                                    c.hexagonId === String(activity.hexagon_index)
+                                                );
+
+                                                // Get shipments for this hexagon
+                                                const shipments = locationData.hexagonCustomerMapping
+                                                    .find(mapping => 
+                                                        String(mapping.hexagon_index) === String(activity.hexagon_index) &&
+                                                        mapping.dc_code === route.dc_code &&
+                                                        mapping.fe_number === route.fe_number &&
+                                                        mapping.ofd_date === route.date
+                                                    )?.delivery_count || 0;
+
+                                                // Calculate pre-RTO earnings per shipment
+                                                const clusterPreRto = clusterCalc?.earningsPerShipmentPreRto || 0;
+                                                const directPreRto = directCalc?.earningsPerShipmentPreRto || 0;
+                                                const flatPreRto = flatCalc?.earningsPerShipmentPreRto || 0;
+
+                                                // Calculate post-RTO earnings per shipment
+                                                const clusterPostRto = clusterCalc?.earningsPerShipmentPostRto || 0;
+                                                const directPostRto = directCalc?.earningsPerShipmentPostRto || 0;
+                                                const flatPostRto = flatCalc?.earningsPerShipmentPostRto || 0;
+
+                                                // Calculate differences (Cluster-based vs Direct Distance)
+                                                const preRtoDiff = clusterPreRto - directPreRto;
+                                                const postRtoDiff = clusterPostRto - directPostRto;
+
+                                                return (
+                                                    <TableRow key={`${route.dc_code}-${route.fe_number}-${route.date}-${activity.hexagon_index}`}>
+                                                        <TableCell>{route.dc_code}</TableCell>
+                                                        <TableCell>{route.fe_number}</TableCell>
+                                                        <TableCell>{activity.hexagon_index}</TableCell>
+                                                        <TableCell>{activity.cluster_id || 'N/A'}</TableCell>
+                                                        <TableCell>{shipments}</TableCell>
+                                                        <TableCell>{activity.rto_percentage?.toFixed(2) || '0.00'}%</TableCell>
+                                                        <TableCell>
+                                                            <Box>
+                                                                <Typography><strong>Cluster:</strong> ₹{clusterPreRto.toFixed(2)}</Typography>
+                                                                <Typography><strong>Direct:</strong> ₹{directPreRto.toFixed(2)}</Typography>
+                                                                <Typography><strong>Flat:</strong> ₹{flatPreRto.toFixed(2)}</Typography>
+                                                            </Box>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Typography color={preRtoDiff > 0 ? 'success.main' : 'error.main'}>
+                                                                ₹{preRtoDiff.toFixed(2)}
+                                                            </Typography>
+                                                            <Typography variant="caption" color="textSecondary">
+                                                                (Cluster - Direct)
+                                                            </Typography>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Box>
+                                                                <Typography><strong>Cluster:</strong> ₹{clusterPostRto.toFixed(2)}</Typography>
+                                                                <Typography><strong>Direct:</strong> ₹{directPostRto.toFixed(2)}</Typography>
+                                                                <Typography><strong>Flat:</strong> ₹{flatPostRto.toFixed(2)}</Typography>
+                                                            </Box>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Typography color={postRtoDiff > 0 ? 'success.main' : 'error.main'}>
+                                                                ₹{postRtoDiff.toFixed(2)}
+                                                            </Typography>
+                                                            <Typography variant="caption" color="textSecondary">
+                                                                (Cluster - Direct)
+                                                            </Typography>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
                     </Paper>
                 </Grid>
             </Grid>

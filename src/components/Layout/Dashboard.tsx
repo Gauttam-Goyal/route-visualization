@@ -198,6 +198,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                             filteredRoutes={filteredData}
                                             payoutCalculations={currentPayouts}
                                             viewMode={viewMode}
+                                            onViewModeChange={setViewMode}
                                         />
                                     );
                                 })()}
