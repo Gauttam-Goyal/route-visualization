@@ -273,7 +273,6 @@ const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes, p
                             mapping.ofd_date === route.date
                         )?.delivery_count || 0;
 
-
                         return {
                             route_id: route.fe_number,
                             dc_code: route.dc_code,
@@ -283,23 +282,17 @@ const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes, p
                         };
                     });
 
-                    // Calculate total shipment count for this hexagon
-                    // const totalShipments = locationData.hexagonCustomerMapping
-                    //     .filter(mapping => String(mapping.hexagon_index) === String(centroid.hexagon_id))
-                    //     .reduce((sum, mapping) => sum + (mapping.delivery_count || 0), 0);
-
-                    
-                    // Check if this hexagon has multiple different cluster IDs
-                    const hasMultipleClusterIds = centroid.all_cluster_ids && centroid.all_cluster_ids.length > 1;
+                    // Use the appears_in_multiple_routes flag from the enriched centroid data
+                    const hasMultipleRoutes = centroid.appears_in_multiple_routes;
                     
                     // For display in the tooltip
-                    const displayClusterId = hasMultipleClusterIds 
-                        ? '*' // Show asterisk when multiple clusters
-                        : (centroid.cluster_id || 'N/A');
+                    const displayClusterId = hasMultipleRoutes 
+                        ? '*' // Show asterisk when hexagon appears in multiple routes
+                        : (centroid.cluster_id?.toString() || 'N/A');
                     
-                    // Color based on the first route's cluster ID
-                    const displayColor = hasMultipleClusterIds
-                        ? '#FF00FF' // Magenta for multiple clusters  
+                    // Color based on multiple routes or single cluster
+                    const displayColor = hasMultipleRoutes
+                        ? '#FF00FF' // Magenta for hexagons in multiple routes
                         : (centroid.cluster_id ? `hsl(${(centroid.cluster_id * 30) % 360}, 70%, 50%)` : 'blue');
                     
                     return (
@@ -319,14 +312,16 @@ const HexagonMap: React.FC<HexagonMapProps> = ({ locationData, filteredRoutes, p
                             </Tooltip>
                             <Popup>
                                 <Typography variant="body2" component="div">
-                                    {hasMultipleClusterIds ? (
-                                        <strong>Multiple Cluster IDs: {centroid.all_cluster_ids.join(', ')}</strong>
+                                    {hasMultipleRoutes ? (
+                                        <>
+                                            <strong>Multiple Routes</strong><br />
+                                            <strong>Cluster IDs:</strong> {centroid.all_cluster_ids.join(', ')}
+                                        </>
                                     ) : (
                                         <strong>Cluster ID: {centroid.cluster_id || 'N/A'}</strong>
                                     )}<br />
                                     <strong>Hexagon ID:</strong> {centroid.hexagon_id}<br />
                                     <strong>Location:</strong> [{centroid.lat.toFixed(5)}, {centroid.lng.toFixed(5)}]<br />
-                                    {/* <strong>Total Shipments:</strong> {totalShipments} */}
                                     
                                     {clusterInfo.length > 0 && (
                                         <>

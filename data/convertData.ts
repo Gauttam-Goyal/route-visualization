@@ -23,8 +23,8 @@ const transformedContent = csvContent.replace(/"([^"]*(""[^"]*)*)"/g, (match) =>
 // Convert the CSV content to the required format
 const rawDataContent = `export const RAW_DATA = \`${transformedContent}\`;`;
 
-// Write to rawData.ts
-const outputPath = join('/Users/gauttamgoyal/Documents/route-visualization/src/data/', 'rawData.ts');
+// Write to rawData.ts using relative path
+const outputPath = join(__dirname, '..', 'src', 'data', 'rawData.ts');
 writeFileSync(outputPath, rawDataContent);
 
 console.log('Conversion completed successfully!'); 
